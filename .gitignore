@@ -1,0 +1,71 @@
+# MPLAB X build artifacts
+pic-firmware/mplab-project/dist/
+pic-firmware/mplab-project/build/
+*.d
+*.p1
+*.pre
+*.rlf
+*.sdb
+*.obj
+*.cof
+*.hex.bak
+nbproject/private/
+
+# PlatformIO build artifacts
+esp-firmware/.pio/
+esp-firmware/.pioenvs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.ipynb_checkpoints/
+
+# Jupyter notebook outputs (keep code, strip outputs via nbstripout)
+# Install: pip install nbstripout && nbstripout --install
+
+# Large model files (push to HuggingFace instead)
+ml-pipeline/models/*.tflite
+ml-pipeline/models/*.h5
+ml-pipeline/models/*.pb
+ml-pipeline/dataset/raw/
+
+# Flutter build
+flutter-app/build/
+flutter-app/.dart_tool/
+flutter-app/.flutter-plugins
+flutter-app/.flutter-plugins-dependencies
+*.apk
+*.aab
+*.ipa
+
+# CAD exports (keep .scad source, gitignore large STLs if needed)
+# Uncomment if STLs are too large:
+# mechanical/stl/*.stl
+
+# Firebase credentials — NEVER commit these
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+**/secrets.h
+**/wifi_creds.h
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+
+# Editor
+.vscode/settings.json
+.idea/
+*.suo
+*.user
