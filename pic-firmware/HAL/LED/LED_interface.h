@@ -6,10 +6,13 @@
 /* LED States */
 #define LED_OFF    0
 #define LED_ON     1
-/* Yellow LED on RB6 for Test Bench */
-#define LED_YELLOW_PORT    0x06   // PORTB Address
-#define LED_YELLOW_TRIS    0x86   // TRISB Address
-#define LED_YELLOW_PIN     6      // Pin 6 (RB6)
+/* Warning LED: RE1 — uses GPIO_PORTE ID (4), not raw address */
+#define LED_YELLOW_PORT    4      /* GPIO_PORTE */
+#define LED_YELLOW_PIN     1      /* RE1 */
+
+/* Fault/Lockout LED: RE2 */
+#define LED_RED_PORT       4      /* GPIO_PORTE */
+#define LED_RED_PIN        2      /* RE2 */
 
 void LED_Init(u8 Port, u8 Pin);
 void LED_On(u8 Port, u8 Pin);

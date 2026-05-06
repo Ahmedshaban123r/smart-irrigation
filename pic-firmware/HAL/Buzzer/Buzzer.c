@@ -1,52 +1,45 @@
 /*
  * Buzzer.c
- * Irrigation Project � Buzzer Driver
- * Target: PIC16F877A | Compiler Agnostic
+ * Active buzzer via NPN transistor on RB2 (active HIGH).
+ * Variable-duration delays use a 1ms loop — XC8 free mode requires
+ * compile-time-constant arguments to __delay_ms.
  */
 
+#include "../../config.h"
 #include "Buzzer_interface.h"
 #include "Buzzer_private.h"
 #include "../../MCAL/MCU_Registers.h"
 #include "../../SERVICES/BIT_MATH.h"
 #include "../../SERVICES/STD_TYPES.h"
 
-/* Notice: Buzzer_Delay_ms() wrapper has been completely removed! */
-
 void Buzzer_Init(void)
 {
-    CLR_BIT(BUZZER_TRIS, BUZZER_PIN); /* Output */
-    CLR_BIT(BUZZER_PORT, BUZZER_PIN); /* LOW */
-}
-
-void Buzzer_On(void)
-{
-    SET_BIT(BUZZER_PORT, BUZZER_PIN);
-}
-
-void Buzzer_Off(void)
-{
+    CLR_BIT(BUZZER_TRIS, BUZZER_PIN);
     CLR_BIT(BUZZER_PORT, BUZZER_PIN);
 }
 
+void Buzzer_On(void)  { SET_BIT(BUZZER_PORT, BUZZER_PIN); }
+void Buzzer_Off(void) { CLR_BIT(BUZZER_PORT, BUZZER_PIN); }
+
 void Buzzer_Beep(u16 duration_ms)
 {
+    u16 i;
     Buzzer_On();
-    __delay_ms(duration_ms); /* Using generic delay */
+    for(i = 0u; i < duration_ms; i++) { __delay_ms(1); }
     Buzzer_Off();
 }
 
 void Buzzer_BeepN(u8 count, u16 ms_on, u16 ms_off)
 {
-    u8 i = 0u;
-    for(i = 0u; i < count; i++)
+    u8  n;
+    u16 i;
+    for(n = 0u; n < count; n++)
     {
         Buzzer_On();
-        __delay_ms(ms_on); /* Using generic delay */
+        for(i = 0u; i < ms_on;  i++) { __delay_ms(1); }
         Buzzer_Off();
-
-        if(i < (u8)(count - 1u))
-        {
-            __delay_ms(ms_off); /* Using generic delay */
+        if(n < (u8)(count - 1u)) {
+            for(i = 0u; i < ms_off; i++) { __delay_ms(1); }
         }
     }
 }

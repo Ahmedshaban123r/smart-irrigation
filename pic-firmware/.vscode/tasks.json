@@ -1,0 +1,46 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build PIC Firmware (XC8)",
+            "type": "shell",
+            "command": "C:/Program Files/Microchip/xc8/v2.36/bin/xc8-cc.exe",
+            "args": [
+                "-mcpu=16F877A",
+                "-O1",
+                "-o", "${workspaceFolder}/output.hex",
+                "${workspaceFolder}/APP/MyProject.c",
+                "${workspaceFolder}/APP/Safety/Safety.c",
+                "${workspaceFolder}/APP/Comms/Comms.c",
+                "${workspaceFolder}/APP/Irrigation/Irrigation.c",
+                "${workspaceFolder}/HAL/LCD/LCD.c",
+                "${workspaceFolder}/HAL/Buzzer/Buzzer.c",
+                "${workspaceFolder}/HAL/Humidity/Humidity.c",
+                "${workspaceFolder}/HAL/LED/LED.c",
+                "${workspaceFolder}/HAL/Ultrasonic/Ultrasonic.c",
+                "${workspaceFolder}/HAL/Button/Button.c",
+                "${workspaceFolder}/HAL/Motor/Motor.c",
+                "${workspaceFolder}/HAL/Fan/Fan.c",
+                "${workspaceFolder}/MCAL/ADC/ADC.c",
+                "${workspaceFolder}/MCAL/USART/USART.c",
+                "${workspaceFolder}/MCAL/GPIO/GPIO.c",
+                "${workspaceFolder}/SERVICES/Delay.c"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": {
+                "owner": "xc8",
+                "fileLocation": ["relative", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.+?):(\\d+):\\s+(error|warning):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            }
+        }
+    ]
+}

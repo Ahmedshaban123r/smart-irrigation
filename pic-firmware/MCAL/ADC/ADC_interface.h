@@ -34,9 +34,22 @@ u16 ADC_Read(u8 channel);
 /*
  * ADC_ReadAverage(channel, samples) → u16
  *   Returns the average of 'samples' consecutive readings.
- *   Use for noisy signals (current sensor especially).
- *   Recommended: samples = 8 for current, 4 for temp/soil.
  */
 u16 ADC_ReadAverage(u8 channel, u8 samples);
+
+/*
+ * ADC_SoilPct(raw) → u8  [0..100]
+ *   Converts 10-bit ADC reading to soil moisture percent.
+ *   Formula: 100 - ((raw - WET_ADC) * 100 / (DRY_ADC - WET_ADC)), clamped 0-100.
+ */
+u8 ADC_SoilPct(u16 raw);
+
+/*
+ * ADC_CurrentmA(raw) → u16
+ *   Converts 10-bit ADC reading from ACS712-05B to milliamps.
+ *   Zero-current offset = 512 (Vcc/2 = 2.5V @ 5V supply).
+ *   Sensitivity = 185 mV/A → (raw - 512) * (5000/1024) / 0.185 ≈ raw * 26.4.
+ */
+u16 ADC_CurrentmA(u16 raw);
 
 #endif /* ADC_INTERFACE_H */

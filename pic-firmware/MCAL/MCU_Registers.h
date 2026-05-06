@@ -19,7 +19,9 @@
 #if defined(__XC8) || defined(__XC)
 
     /* XC8: device header supplies all SFR / bit-field names */
+    #ifndef _XTAL_FREQ
     #define _XTAL_FREQ  8000000UL
+    #endif
     #include <xc.h>
 
     #define INTERRUPT_ROUTINE void __interrupt() ISR_Routine(void)
@@ -139,11 +141,14 @@
 #define RELAY_TRIS       TRISD
 #define RELAY_PIN        0
 
-#define BUZZER_PORT      PORTD
-#define BUZZER_TRIS      TRISD
-#define BUZZER_PIN       1
+#define BUZZER_PORT      PORTB
+#define BUZZER_TRIS      TRISB
+#define BUZZER_PIN       2   /* RB2 */
 
-#define LED_RED_PORT     2   /* GPIO_PORTC */
-#define LED_RED_PIN      1   /* RC1 */
+#define LED_YELLOW_PORT  4   /* GPIO_PORTE */
+#define LED_YELLOW_PIN   1   /* RE1 */
+
+#define LED_RED_PORT     4   /* GPIO_PORTE */
+#define LED_RED_PIN      2   /* RE2 */
 
 #endif /* MCU_REGISTERS_H */

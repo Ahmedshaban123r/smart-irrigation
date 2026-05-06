@@ -16,7 +16,7 @@
 
 /* ── ADCON1 config: all AN0..AN4 analog, VREF=VDD/VSS, right-justified ── */
 /*    ADFM=1 (right), PCFG3:0 = 0b0000 → AN0..AN7 analog                 */
-#define ADC_ADCON1_CONFIG   0b10000000   /* ADFM=1, all analog */
+#define ADC_ADCON1_CONFIG   0b10000100   /* ADFM=1 right-just; PCFG=0100: AN0-AN2 analog, RE1/RE2 digital */
 
 /* ── Acquisition delay: Tad * 12 ≈ 20µs minimum required ── */
 #define ADC_ACQ_DELAY_US    25

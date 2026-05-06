@@ -43,7 +43,7 @@
 /* ================================================================
    ADC
    ================================================================ */
-#define ADCON1_CONFIG   0x04u   /* RA0,RA1,RA2 analog; right-justified; Vref=VDD */
+#define ADCON1_CONFIG   0x84u   /* ADFM=1 right-just; PCFG=0100: AN0-AN2 analog, RE1/RE2 digital */
 #define ADC_CH_SOIL     0u      /* AN0 / RA0 — capacitive soil moisture sensor   */
 #define ADC_CH_CURRENT  2u      /* AN2 / RA2 — ACS712-05B current sensor         */
 

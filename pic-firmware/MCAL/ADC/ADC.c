@@ -4,6 +4,7 @@
  * Target: PIC16F877A @ 8 MHz | Compiler Agnostic
  */
 
+#include "../../config.h"
 #include "ADC_interface.h"
 #include "ADC_private.h"
 #include "ADC_config.h"
@@ -69,4 +70,28 @@ u16 ADC_ReadAverage(u8 channel, u8 samples)
         sum += ADC_Read(channel);
     }
     return (u16)(sum / samples);
+}
+
+u8 ADC_SoilPct(u16 raw)
+{
+    u16 wet = WET_ADC;
+    u16 dry = DRY_ADC;
+    s16 pct;
+
+    if(raw <= wet) return 100u;
+    if(raw >= dry) return 0u;
+    pct = (s16)(100 - (((s16)(raw - wet)) * 100 / (s16)(dry - wet)));
+    if(pct < 0)   pct = 0;
+    if(pct > 100) pct = 100;
+    return (u8)pct;
+}
+
+u16 ADC_CurrentmA(u16 raw)
+{
+    s16 offset;
+    s16 signed_raw = (s16)raw;
+
+    offset = signed_raw - 512;
+    if(offset < 0) offset = -offset;
+    return (u16)((u16)offset * 26u);
 }
