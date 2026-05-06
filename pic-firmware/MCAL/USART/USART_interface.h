@@ -7,21 +7,28 @@
 #include "../../SERVICES/STD_TYPES.h"
 #include "../../SERVICES/BIT_MATH.h"
 
-/* Initialization */
+/* --- Initialization --- */
+
+/* Combined TX+RX init, no interrupts (polling mode).
+   Use this for the irrigation controller comms layer. */
+void UART_Init(void);
+
+/* Legacy separate inits (interrupt-driven RX) — kept for compatibility */
 void UART_RX_Init(void);
 void UART_TX_Init(void);
 
-/* Data Operations */
-void UART_Write(u8 Data);
-void UART_Write_ISR(u8 Data);
-u8 UART_Read(void);
+/* --- Data Operations --- */
+void UART_Write(u8 Data);           /* Blocking TX — waits for TRMT    */
+void UART_Write_ISR(u8 Data);       /* Same as UART_Write, ISR-safe     */
+u8   UART_Read(void);               /* Blocking RX — waits for RCIF     */
+u8   UART_DataAvailable(void);      /* Non-blocking: 1 if byte waiting  */
+void UART_WriteString(char *str);
 
-/* Status */
+/* --- Status --- */
 u8 UART_TX_Empty(void);
 
+/* --- Interrupt-driven support (used with UART_RX_Init only) --- */
 void UART_SetCallback(void (*Callback)(u8));
 void UART_ISR(void);
-
-void UART_WriteString(char *str);
 
 #endif
