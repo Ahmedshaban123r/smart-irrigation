@@ -1,5 +1,5 @@
 # Circuit & Pinout Reference
-## PIC16F877A @ 8 MHz — Smart Irrigation Sensor Test
+## PIC16F877A @ 8 MHz — Smart Irrigation Controller
 
 ---
 
@@ -10,33 +10,50 @@
 | MCU | PIC16F877A |
 | Clock | 8 MHz external crystal (HS mode) |
 | Supply | 5 V |
-| Compiler | MPLAB XC8 |
+| Compiler | MPLAB XC8 v2.36 |
+| Config bits | FOSC=HS, WDTE=OFF, PWRTE=ON, BOREN=ON, **LVP=OFF** (frees RB3) |
 
 ---
 
 ## Complete Pin Assignment
 
-| PIC Pin | Port/Pin | Connected To | Direction |
-|---|---|---|---|
-| 2 | RA0 / AN0 | Soil moisture sensor AO | Input (analog) |
-| 3 | RA1 / AN1 | LM35 OUT *(unused in test)* | Input (analog) |
-| 4 | RA2 / AN2 | ACS712 OUT | Input (analog) |
-| 13 | OSC1 | 8 MHz crystal | — |
-| 14 | OSC2 | 8 MHz crystal | — |
-| 33 | RB0 | DHT11 DATA (+ 4.7 kΩ pull-up to VCC) | Bidirectional |
-| 19 | RD0 | Relay module IN | Output |
-| 20 | RD1 | Buzzer + | Output |
-| 21 | RD2 | LCD RS | Output |
-| 22 | RD3 | LCD E (Enable) | Output |
-| 23 | RD4 | LCD D4 | Output |
-| 24 | RD5 | LCD D5 | Output |
-| 25 | RD6 | LCD D6 | Output |
-| 26 | RD7 | LCD D7 | Output |
-| 18 | RC1 | LED (Red) anode | Output |
-| 11, 32 | VDD | +5 V | Power |
-| 12, 31 | VSS | GND | Power |
+| PIC Pin | Port/Pin | Signal | Direction | Notes |
+|---|---|---|---|---|
+| 2 | RA0 / AN0 | Soil moisture AO | Input (analog) | Capacitive sensor v1.2 |
+| 3 | RA1 / AN1 | *(unused)* | Input (analog) | Configured analog, never read |
+| 4 | RA2 / AN2 | ACS712-05B OUT | Input (analog) | Current sensor |
+| 13 | OSC1 | 8 MHz crystal | — | |
+| 14 | OSC2 | 8 MHz crystal | — | |
+| 33 | RB0 | DHT11 DATA | Bidirectional | 4.7 kΩ pull-up to VCC required |
+| 34 | RB1 | HC-SR04 ECHO | Input | |
+| 35 | RB2 | Buzzer (via NPN) | Output | Active HIGH |
+| 36 | RB3 | Limit switch | Input | Active LOW, PORTB pull-up |
+| 37 | RB4 | E-Stop button | Input | Active LOW, PORTB pull-up |
+| 15 | RC0 | A4988 STEP | Output | Step pulse |
+| 16 | RC1 | A4988 DIR | Output | HIGH = away from home |
+| 17 | RC2 | A4988 ENABLE | Output | LOW = enabled, HIGH = disabled |
+| 18 | RC3 | HC-SR04 TRIG | Output | 10 µs pulse |
+| 23 | RC4 | Fan (via NPN) | Output | Active HIGH |
+| 25 | RC6 | UART TX → Pi | Output | PIC → Pi (9600 baud) |
+| 26 | RC7 | UART RX ← Pi | Input | Pi → PIC |
+| 19 | RD0 | Pump relay IN | Output | **Active LOW: LOW=ON, HIGH=OFF** |
+| 20 | RD1 | Spare relay IN | Output | Keep HIGH (OFF) always |
+| 21 | RD2 | LCD RS | Output | |
+| 22 | RD3 | LCD Enable | Output | |
+| 27 | RD4 | LCD D4 | Output | |
+| 28 | RD5 | LCD D5 | Output | |
+| 29 | RD6 | LCD D6 | Output | |
+| 30 | RD7 | LCD D7 | Output | |
+| 9 | RE1 | Yellow/Amber LED | Output | Warning indicator |
+| 10 | RE2 | Red LED | Output | Fault/Lockout indicator |
+| 11, 32 | VDD | +5 V | Power | |
+| 12, 31 | VSS | GND | Power | |
 
-> LCD RW pin → tied directly to GND on the LCD module (always write mode, not connected to PIC).
+> **PORTD shadow register:** PORTD is shared by the LCD (RD2–RD7) and pump/spare relays (RD0–RD1).
+> All PORTD writes in firmware go through `portd_shadow` to prevent relay state corruption during LCD operations.
+
+> **Voltage warning:** PIC UART TX outputs 5 V. Pi RX expects max 3.3 V. Use a resistor divider
+> (1 kΩ + 2 kΩ) or level-shifter on the PIC TX → Pi RX line. Pi TX (3.3 V) → PIC RX is safe (PIC VIH ≈ 2.0 V @ 5 V supply).
 
 ---
 
@@ -44,20 +61,20 @@
 
 ```
 LCD Module          PIC16F877A
-─────────           ──────────
+──────────          ──────────
 VSS  (pin 1)  ───── GND
 VDD  (pin 2)  ───── +5V
-VO   (pin 3)  ───── Potentiometer wiper (contrast adjust, 10 kΩ pot between VCC and GND)
+VO   (pin 3)  ───── 10 kΩ pot wiper (contrast, between VCC and GND)
 RS   (pin 4)  ───── RD2
-RW   (pin 5)  ───── GND  (always write)
+RW   (pin 5)  ───── GND  (always write — do NOT connect to PIC)
 E    (pin 6)  ───── RD3
-D0-D3 (pins 7-10) ─ NOT CONNECTED (4-bit mode)
+D0–D3 (7–10)  ───── NOT CONNECTED (4-bit mode)
 D4   (pin 11) ───── RD4
 D5   (pin 12) ───── RD5
 D6   (pin 13) ───── RD6
 D7   (pin 14) ───── RD7
-A    (pin 15) ───── +5V (backlight anode, add 33 Ω series resistor)
-K    (pin 16) ───── GND (backlight cathode)
+A    (pin 15) ───── +5V via 33 Ω (backlight)
+K    (pin 16) ───── GND
 ```
 
 ---
@@ -69,16 +86,49 @@ DHT11               PIC16F877A
 ─────               ──────────
 VCC  (pin 1)  ───── +5V
 DATA (pin 2)  ───── RB0
-               └─── 4.7 kΩ pull-up resistor to +5V  ← REQUIRED
+               └─── 4.7 kΩ pull-up to +5V  ← REQUIRED
 NC   (pin 3)  ───── (not connected)
 GND  (pin 4)  ───── GND
 ```
 
-> Without the 4.7 kΩ pull-up on DATA, the line floats and reads will fail.
+**Error codes returned by `Humidity_Read()`:**
+
+| Code | Meaning |
+|---|---|
+| 0 | OK |
+| 2 | No sensor response (check wiring / pull-up) |
+| 3 | Bit-read timeout |
+| 4 | Checksum mismatch (noisy line) |
 
 ---
 
-## Soil Moisture Sensor (resistive/capacitive module)
+## HC-SR04 — Ultrasonic Distance Sensor (water level)
+
+```
+HC-SR04             PIC16F877A
+───────             ──────────
+VCC           ───── +5V
+TRIG          ───── RC3  (10 µs pulse)
+ECHO          ───── RB1  (measure HIGH duration)
+GND           ───── GND
+```
+
+**Firmware constants:**
+
+| Parameter | Value |
+|---|---|
+| Tank height | 30 cm |
+| Warn level | water_cm ≤ 5 cm |
+| Action level | water_cm ≤ 2 cm |
+| Clear level | water_cm ≥ 6 cm |
+| Loop time per count | 2 µs |
+| Timeout | 12500 loops (25 ms) |
+
+Water level = `TANK_HEIGHT_CM − measured_distance_cm`. Median of 3 readings used.
+
+---
+
+## Soil Moisture Sensor (capacitive v1.2)
 
 ```
 Sensor Module       PIC16F877A
@@ -86,17 +136,17 @@ Sensor Module       PIC16F877A
 VCC           ───── +5V
 GND           ───── GND
 AO (analog)   ───── RA0 / AN0
-DO (digital)  ───── NOT CONNECTED (unused)
+DO (digital)  ───── NOT CONNECTED
 ```
 
-**Calibration values (in firmware):**
+**Calibration (in `config.h`):**
 
-| State | ADC Reading |
-|---|---|
-| Dry (air) | 820 |
-| Wet (submerged) | 350 |
+| State | ADC Raw | % |
+|---|---|---|
+| Dry (air) | 614 | 0 % |
+| Wet (water) | 245 | 100 % |
 
-Adjust `SOIL_DRY_ADC` and `SOIL_WET_ADC` in `HAL/Soil/Soil_config.h` to match your sensor.
+Formula: `soil_pct = 100 − ((raw − 245) × 100 / (614 − 245))`, clamped 0–100.
 
 ---
 
@@ -109,58 +159,147 @@ VCC           ───── +5V
 GND           ───── GND
 OUT           ───── RA2 / AN2
 IP+  }
-IP-  }        ───── In series with the load being measured
+IP-  }        ───── In series with pump motor
 ```
 
-**Firmware constants (`HAL/Current/Current_config.h`):**
+**Firmware constants:**
 
 | Parameter | Value |
 |---|---|
-| Supply | 5000 mV |
-| Zero-current output | 2500 mV (VCC/2) |
-| Sensitivity | 66 mV/A (05B variant) |
-| ADC resolution | 1024 counts (10-bit) |
+| Zero-current ADC | 512 (2.5 V at 5 V supply) |
+| Sensitivity | 185 mV/A → ×26 counts/A |
+| Warn threshold | 3500 mA |
+| Action threshold | 4500 mA |
+| Clear threshold | 3000 mA |
 
-> For ACS712-20A (±20 A): change `CURRENT_SENS_MV_A` to `100`.
-> For ACS712-30A (±30 A): change to `66` → `133`.
-
----
-
-## Buzzer
-
-```
-Buzzer              PIC16F877A
-──────              ──────────
-+  (or S)     ───── RD1
-−  (or −)     ───── GND
-```
-
-Use an NPN transistor (e.g., 2N2222) if buzzer current > 25 mA:
-```
-RD1 ──[1 kΩ]── Base
-              Collector ── Buzzer+ ── +5V
-              Emitter   ── GND
-```
+Formula: `curr_mA = abs(raw − 512) × 26`
 
 ---
 
-## Relay Module
+## Pump Relay (Active LOW)
 
 ```
 Relay Module        PIC16F877A
 ────────────        ──────────
 VCC           ───── +5V
 GND           ───── GND
-IN            ───── RD0
+IN            ───── RD0  (LOW = pump ON, HIGH = pump OFF)
+```
+
+> Relay default state at power-up: `portd_shadow = 0xFF` → RD0 HIGH → pump OFF. Safe start.
+
+---
+
+## Buzzer
+
+```
+RB2 ──[1 kΩ]── NPN Base (2N2222)
+               Collector ── Buzzer+ ── +5V
+               Emitter   ── GND
+               Buzzer−   ── GND
+```
+
+Active HIGH on RB2. Patterns: 1 beep = warning, 2 beeps = lockout event.
+
+---
+
+## Stepper Motor — A4988 Driver
+
+```
+A4988 Pin           PIC16F877A
+─────────           ──────────
+STEP          ───── RC0
+DIR           ───── RC1  (HIGH = away from home)
+ENABLE        ───── RC2  (LOW = enabled, HIGH = disabled)
+MS1/MS2/MS3   ───── Set for 1/16 microstepping (all HIGH)
+RESET         ───── +5V (tie high)
+SLEEP         ───── +5V (tie high)
+VDD (logic)   ───── +5V
+VMOT          ───── Motor supply (12 V recommended)
+GND           ───── GND
+1A,1B,2A,2B   ───── Stepper motor coils
+```
+
+**Limit switch (home position):**
+```
+RB3 ──── Limit switch ──── GND   (active LOW, PORTB pull-up enabled)
+```
+
+**Plant positions (microsteps from home, 1/16 step, GT2 20T pulley):**
+
+| Plant | Steps | Distance |
+|---|---|---|
+| 0 | 4 000 | 50 mm |
+| 1 | 12 000 | 150 mm |
+| 2 | 20 000 | 250 mm |
+| 3 | 28 000 | 350 mm |
+| 4 | 36 000 | 450 mm |
+
+---
+
+## Cooling Fan
+
+```
+RC4 ──[1 kΩ]── NPN Base
+               Collector ── Fan+ ── +5V (or 12V with appropriate NPN)
+               Emitter   ── GND
+```
+
+Active HIGH on RC4. Turns ON at temp ≥ 55 °C, turns OFF when temp < 50 °C and all other sensors clear.
+
+---
+
+## LEDs
+
+```
+RE1 ──[330 Ω]── Yellow/Amber LED anode ── cathode ── GND   (Warning)
+RE2 ──[330 Ω]── Red LED anode          ── cathode ── GND   (Fault/Lockout)
 ```
 
 ---
 
-## LED (Red)
+## E-Stop Button
 
 ```
-RC1 ──[330 Ω]── LED anode ── LED cathode ── GND
+RB4 ──── Normally-open button ──── GND   (active LOW, PORTB pull-up)
 ```
+
+Press = toggle e-stop. First press: pump OFF, stepper disabled, LCD "E-STOP ACTIVE". Second press: releases.
+
+---
+
+## UART — Pi ↔ PIC Communication
+
+```
+Raspberry Pi        Level Shift         PIC16F877A
+────────────        ───────────         ──────────
+GPIO14 (TX) ─────────────────────────── RC7 (RX)   3.3 V → PIC: OK
+GPIO15 (RX) ──── 1 kΩ/2 kΩ divider ─── RC6 (TX)   5 V → 3.3 V required
+GND ─────────────────────────────────── GND
+```
+
+**Protocol: 9600 baud, 8N1, polling mode (no interrupts)**
+
+| Direction | Format | Meaning |
+|---|---|---|
+| Pi → PIC | `[0xBB][CMD][DATA]` | 3-byte fixed packet |
+| PIC → Pi | `[0xAA][TYPE][DATA...]` | Variable length |
+
+**Pi → PIC commands:**
+
+| CMD | DATA | Action |
+|---|---|---|
+| 0x01 | 0x00/0x01 | Switch mode (auto/manual) |
+| 0x02 | 0–4 | Irrigate plant N (manual) |
+| 0x03 | 0x01/0x00 | App e-stop set/release |
+
+**PIC → Pi packets:**
+
+| TYPE | Data bytes | Content |
+|---|---|---|
+| 0x01 | 6 | soil%, temp°C, hum%, curr_hi, curr_lo, water_cm |
+| 0x02 | 1 | plant_index — "take image now" |
+| 0x03 | 2 | mode, lockout flag |
 
 ---
 
@@ -176,35 +315,43 @@ RC1 ──[330 Ω]── LED anode ── LED cathode ── GND
 
 ## Power Supply Decoupling
 
-Place a **100 nF ceramic capacitor** between VDD and VSS as close to the PIC as possible (pins 11/12 and 32/31). Optionally add a **10 µF electrolytic** in parallel.
+Place **100 nF ceramic** between VDD and VSS close to PIC (pins 11/12 and 32/31). Add **10 µF electrolytic** in parallel. Separate decoupling cap for A4988 VMOT (100 µF, close to driver).
+
+---
+
+## Safety Thresholds Summary
+
+| Feature | Warn | Action | Clear |
+|---|---|---|---|
+| Soil overwater | ≥ 80 % | ≥ 90 % | ≤ 75 % |
+| Overcurrent | ≥ 3500 mA | ≥ 4500 mA | ≤ 3000 mA |
+| Overheat | ≥ 55 °C | ≥ 70 °C | ≤ 50 °C |
+| Low water | ≤ 5 cm | ≤ 2 cm | ≥ 6 cm |
+
+Lockout clears only when **all 4** sensors are simultaneously below their clear thresholds.
 
 ---
 
 ## ADC Channel Summary
 
-| Channel | Pin | Sensor | Samples |
+| Channel | Pin | Sensor | Formula |
 |---|---|---|---|
-| AN0 | RA0 | Soil Moisture | 4 |
-| AN1 | RA1 | LM35 *(unused)* | — |
-| AN2 | RA2 | ACS712 Current | 8 |
+| AN0 | RA0 | Soil moisture | `100 − ((raw−245)×100/369)` |
+| AN1 | RA1 | *(unused)* | — |
+| AN2 | RA2 | ACS712 current | `abs(raw−512) × 26` |
 
-ADC clock: Fosc/32 → Tad = 4 µs @ 8 MHz. VREF = VDD/VSS (0–5 V range).
+ADC clock: Fosc/32 → Tad = 4 µs @ 8 MHz. VREF = VDD/VSS.
 
 ---
 
-## Display Page Cycle
-
-LCD cycles every 2 seconds:
+## LCD Display Pages (main loop, cycling every 2 s)
 
 | Page | Row 1 | Row 2 |
 |---|---|---|
-| 0 | `Hum : XX %` | `Temp: XX C` |
-| 1 | `Soil: XX %` | `Curr: XXXX mA` |
+| 0 | `Soil:XX%` | Status / fault |
+| 1 | `Temp:XXC` | Status / fault |
+| 2 | `Hum :XX%` | Status / fault |
+| 3 | `Curr:XXXXmA` | Status / fault |
+| 4 | `Watr:XXcm` | Status / fault |
 
-If DHT11 read fails, Page 0 shows `DHT11 Error:` + error code:
-
-| Code | Meaning |
-|---|---|
-| 2 | No sensor response (check wiring / pull-up) |
-| 3 | Bit-read timeout (timing issue) |
-| 4 | Checksum mismatch (noisy line) |
+Row 2 shows: `E-STOP ACTIVE`, `LOCKOUT!`, `Manual Mode`, or `Auto Mode OK`.
