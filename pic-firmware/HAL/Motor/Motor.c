@@ -3,6 +3,7 @@
  * A4988 stepper driver, 1/16 microstepping.
  * RC0=STEP, RC1=DIR (HIGH=away from home), RC2=ENABLE (LOW=on).
  * RB3=limit switch (active LOW) marks home position.
+ * RD1=motor relay (active LOW) switches motor power; toggled via portd_shadow.
  * Button polled every 50 steps inside move loops to catch e-stop.
  */
 
@@ -13,9 +14,23 @@
 #include "../../SERVICES/BIT_MATH.h"
 #include "../../SERVICES/STD_TYPES.h"
 
+extern volatile u8 portd_shadow;
+
 static s32 current_position = 0;
 
 static const u32 plant_positions[NUM_PLANTS] = {4000u, 12000u, 20000u, 28000u, 36000u};
+
+static void motor_relay_on(void)
+{
+    portd_shadow &= (u8)(~(u8)(1u << PIN_MOTOR));
+    PORTD = portd_shadow;
+}
+
+static void motor_relay_off(void)
+{
+    portd_shadow |= (u8)(1u << PIN_MOTOR);
+    PORTD = portd_shadow;
+}
 
 static void step_once(u8 delay_ms)
 {
@@ -32,13 +47,12 @@ void Motor_Home(void)
     u32 backoff;
     u16 poll_cnt = 0u;
 
-    /* Enable driver */
-    CLR_BIT(PORTC, PIN_ENABLE);
+    motor_relay_on();
+    CLR_BIT(PORTC, PIN_ENABLE);          /* Enable A4988 */
 
-    /* Drive toward home (DIR=LOW = toward home) */
-    CLR_BIT(PORTC, PIN_DIR);
+    CLR_BIT(PORTC, PIN_DIR);             /* DIR LOW = toward home */
 
-    while(GET_BIT(PORTB, PIN_LIMIT))   /* limit = HIGH when not triggered */
+    while(GET_BIT(PORTB, PIN_LIMIT))
     {
         step_once(STEP_DELAY_HOMING_MS);
         poll_cnt++;
@@ -73,6 +87,7 @@ void Motor_MoveTo(u8 plant_index)
     delta  = target - current_position;
     steps  = (delta < 0) ? (u32)(-delta) : (u32)delta;
 
+    motor_relay_on();
     CLR_BIT(PORTC, PIN_ENABLE);
 
     if(delta > 0) SET_BIT(PORTC, PIN_DIR);
@@ -96,5 +111,6 @@ void Motor_MoveTo(u8 plant_index)
 
 void Motor_Disable(void)
 {
-    SET_BIT(PORTC, PIN_ENABLE);   /* HIGH = disabled */
+    SET_BIT(PORTC, PIN_ENABLE);   /* A4988 ENABLE HIGH = disabled */
+    motor_relay_off();            /* Cut motor power via relay */
 }

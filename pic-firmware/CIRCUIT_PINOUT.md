@@ -37,7 +37,7 @@
 | 25 | RC6 | UART TX → Pi | Output | PIC → Pi (9600 baud) |
 | 26 | RC7 | UART RX ← Pi | Input | Pi → PIC |
 | 19 | RD0 | Pump relay IN | Output | **Active LOW: LOW=ON, HIGH=OFF** |
-| 20 | RD1 | Spare relay IN | Output | Keep HIGH (OFF) always |
+| 20 | RD1 | Motor relay IN | Output | **Active LOW: LOW=ON, HIGH=OFF** |
 | 21 | RD2 | LCD RS | Output | |
 | 22 | RD3 | LCD Enable | Output | |
 | 27 | RD4 | LCD D4 | Output | |
@@ -176,17 +176,20 @@ Formula: `curr_mA = abs(raw − 512) × 26`
 
 ---
 
-## Pump Relay (Active LOW)
+## Dual-Channel Relay Module (Active LOW)
 
 ```
-Relay Module        PIC16F877A
-────────────        ──────────
+Relay Module        PIC16F877A          Load
+────────────        ──────────          ────
 VCC           ───── +5V
 GND           ───── GND
-IN            ───── RD0  (LOW = pump ON, HIGH = pump OFF)
+IN1           ───── RD0               Pump (LOW=ON, HIGH=OFF)
+IN2           ───── RD1               Motor / A4988 VMOT (LOW=ON, HIGH=OFF)
 ```
 
-> Relay default state at power-up: `portd_shadow = 0xFF` → RD0 HIGH → pump OFF. Safe start.
+> Both relays start HIGH (OFF) at power-up via `portd_shadow = 0xFF`. Safe start.
+> Motor relay is switched ON by Motor.c before any move and OFF by `Motor_Disable()`.
+> Safety lockout and e-stop both cut motor relay immediately via `portd_shadow`.
 
 ---
 

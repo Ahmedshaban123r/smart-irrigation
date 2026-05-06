@@ -39,7 +39,12 @@ static void pump_off(void)
     PORTD = portd_shadow;
 }
 
-static void stepper_off(void) { SET_BIT(PORTC, PIN_ENABLE); }
+static void motor_off(void)
+{
+    SET_BIT(PORTC, PIN_ENABLE);           /* A4988 ENABLE HIGH = disabled */
+    portd_shadow |= (u8)(1u << PIN_MOTOR);
+    PORTD = portd_shadow;
+}
 
 void Safety_Init(void)
 {
@@ -92,7 +97,7 @@ void Safety_RunChecks(u8 soil_pct, u8 temp_c, u16 curr_mA, u8 water_cm)
     if(curr_mA >= CURR_ACTION_MA) {
         any_action = 1u;
         pump_off();
-        stepper_off();
+        motor_off();
         curr_warn = 2u;
         LCD_GoToRowCol(2u, 1u);
         LCD_SendString_Const("LOCKOUT!OverCurr");
@@ -109,7 +114,7 @@ void Safety_RunChecks(u8 soil_pct, u8 temp_c, u16 curr_mA, u8 water_cm)
     if(temp_c >= TEMP_ACTION_C) {
         any_action = 1u;
         pump_off();
-        stepper_off();
+        motor_off();
         Fan_On();
         temp_warn = 2u;
         LCD_GoToRowCol(2u, 1u);

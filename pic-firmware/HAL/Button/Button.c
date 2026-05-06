@@ -39,8 +39,9 @@ void Button_Poll(void)
     if(debounce_count == 3u && last_state == 1u) {
         estop_active ^= 1u;
         if(estop_active) {
-            /* Immediately safe: pump OFF, stepper DISABLED */
+            /* Immediately safe: pump OFF, motor relay OFF, stepper DISABLED */
             portd_shadow |= (u8)(1u << PIN_PUMP);
+            portd_shadow |= (u8)(1u << PIN_MOTOR);
             PORTD = portd_shadow;
             SET_BIT(PORTC, PIN_ENABLE);
         }

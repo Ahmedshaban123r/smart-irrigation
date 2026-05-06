@@ -139,8 +139,8 @@
 /* RC6 = UART TX (PIC→Pi), RC7 = UART RX (Pi→PIC) — managed by USART driver   */
 
 /* PORTD — shadow register required (LCD + relays share this port) */
-#define PIN_PUMP    0   /* RD0 — pump relay (ACTIVE LOW: LOW=ON, HIGH=OFF)      */
-#define PIN_SPARE   1   /* RD1 — spare relay (keep HIGH/OFF always)             */
+#define PIN_PUMP    0   /* RD0 — pump relay   (ACTIVE LOW: LOW=ON, HIGH=OFF)    */
+#define PIN_MOTOR   1   /* RD1 — motor relay  (ACTIVE LOW: LOW=ON, HIGH=OFF)    */
 #define PIN_RS      2   /* RD2 — LCD RS                                         */
 #define PIN_LCDEN   3   /* RD3 — LCD Enable                                     */
 /* RD4-RD7 = LCD D4-D7 (4-bit mode)                                             */

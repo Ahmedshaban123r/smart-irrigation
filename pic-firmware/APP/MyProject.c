@@ -71,7 +71,7 @@ void main(void)
     CLR_BIT(OPTION_REG, 7u);
 
     /* ── Initial output state ── */
-    PORTD = portd_shadow;            /* Pump OFF (RD0=1), spare OFF (RD1=1) */
+    PORTD = portd_shadow;            /* Pump OFF (RD0=1), motor relay OFF (RD1=1) */
     SET_BIT(PORTC, PIN_ENABLE);      /* Stepper DISABLED */
     CLR_BIT(PORTC, PIN_TRIG);        /* HC-SR04 trigger idle LOW */
     CLR_BIT(PORTC, PIN_DIR);
