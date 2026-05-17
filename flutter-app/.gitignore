@@ -1,0 +1,75 @@
+# AI assistant local files
+.claude/
+docs/superpowers/
+PLAN.md
+plan.md
+CLAUDE.md
+
+# Kotlin compiler artifacts
+**/.kotlin/
+
+# Non-target platforms (Android + Web only)
+ios/
+macos/
+linux/
+windows/
+
+# IDE / tool files
+.vscode/
+.metadata
+devtools_options.yaml
+
+# Unused font variants
+fonts/DM_Sans/static/
+fonts/DM_Sans/OFL.txt
+fonts/DM_Sans/README.txt
+
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+.fake
+
+lib/firebase_options.dart
