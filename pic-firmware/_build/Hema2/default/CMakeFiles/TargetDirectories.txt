@@ -1,0 +1,5 @@
+E:/CIE Year 3/Spring 2026/CIE 406 (Embedded Systems)/smart-irrigation-main/smart-irrigation-main/pic-firmware/_build/Hema2/default/CMakeFiles/Hema2_default_default_XC8_assemble.dir
+E:/CIE Year 3/Spring 2026/CIE 406 (Embedded Systems)/smart-irrigation-main/smart-irrigation-main/pic-firmware/_build/Hema2/default/CMakeFiles/Hema2_default_default_XC8_compile.dir
+E:/CIE Year 3/Spring 2026/CIE 406 (Embedded Systems)/smart-irrigation-main/smart-irrigation-main/pic-firmware/_build/Hema2/default/CMakeFiles/Hema2_default_image_Fj0SYNWM.dir
+E:/CIE Year 3/Spring 2026/CIE 406 (Embedded Systems)/smart-irrigation-main/smart-irrigation-main/pic-firmware/_build/Hema2/default/CMakeFiles/edit_cache.dir
+E:/CIE Year 3/Spring 2026/CIE 406 (Embedded Systems)/smart-irrigation-main/smart-irrigation-main/pic-firmware/_build/Hema2/default/CMakeFiles/rebuild_cache.dir

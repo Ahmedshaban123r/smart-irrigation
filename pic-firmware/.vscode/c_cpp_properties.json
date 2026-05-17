@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Program Files/Microchip/xc8/v3.10/pic/include/**",
+                "C:/Program Files/Microchip/xc8/v3.10/pic/include/proc/**"
+            ],
+            "defines": [
+                "_XTAL_FREQ=8000000",
+                "__XC8",
+                "__PICC__"
+            ],
+            "compilerPath": "C:/Program Files/Microchip/xc8/v3.10/bin/xc8-cc.exe",
+            "cStandard": "c99",
+            "intelliSenseMode": "gcc-x86"
+        }
+    ],
+    "version": 4
+}

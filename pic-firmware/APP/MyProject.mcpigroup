@@ -1,0 +1,6 @@
+[PROJECTS]
+Count=2
+Project0=..\..\..\..\Labs\ES_Course_Labs\MyProject.mcppi
+Project1=..\..\..\MyProject.mcppi
+[ActiveProject]
+Index=1

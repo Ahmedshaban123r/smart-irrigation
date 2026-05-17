@@ -1,0 +1,5 @@
+E:/temp_xc8/pic-firmware/_build/Hema/default/CMakeFiles/Hema_default_default_XC8_assemble.dir
+E:/temp_xc8/pic-firmware/_build/Hema/default/CMakeFiles/Hema_default_default_XC8_compile.dir
+E:/temp_xc8/pic-firmware/_build/Hema/default/CMakeFiles/Hema_default_image_Uusundml.dir
+E:/temp_xc8/pic-firmware/_build/Hema/default/CMakeFiles/edit_cache.dir
+E:/temp_xc8/pic-firmware/_build/Hema/default/CMakeFiles/rebuild_cache.dir
