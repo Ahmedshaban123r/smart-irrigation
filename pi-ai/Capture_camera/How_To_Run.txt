@@ -1,0 +1,2 @@
+chmod +x ~/irrigation/capture_and_infer.sh
+./capture_and_infer.sh
