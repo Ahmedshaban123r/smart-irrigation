@@ -558,22 +558,7 @@ Per-stream gate ownership and mitigation paths are tabulated in
 
 ---
 
-## 15. Team
-
-| Member | Stream | Responsibility |
-|--------|--------|----------------|
-| Ahmed Khaled (team lead) | A | Analog front-end, ADC drivers, safety algorithms |
-| M2 | A | Stepper control, UART driver, command-priority engine |
-| M3 | B | ML training pipeline, Pi inference daemon, action protocols |
-| M4 | C | Pi ↔ Firebase bridge, Flutter application |
-| M5 | D | Mechanical CAD, 3D printing, wiring harness |
-
-The single contributor recorded on the Git remote at the time of writing is
-`IbrahimHanafy2222 / s-ibrahim.hanafy@zewailcity.edu.eg`.
-
----
-
-## 16. References
+## 15. References
 
 1. Microchip Technology, *PIC16F87XA Data Sheet*, DS39582.
 2. Allegro MicroSystems, *ACS712 Fully Integrated, Hall-Effect-Based Linear
