@@ -33,16 +33,21 @@ single, gate-driven engineering process.
 | Subsystem | Hardware | Toolchain | Role |
 |-----------|----------|-----------|------|
 | Real-time controller | PIC16F877A-I/P (8 MHz crystal) | MPLAB X IDE + XC8 v2.36 | Deterministic sensing, safety FSM, motion control, UART arbitration |
+| Wi-Fi pump actuator | ESP8266 NodeMCU v3 | Arduino core, `Firebase_ESP_Client` | Wireless pump relay triggered by Firebase commands from the app / Pi |
 | Edge AI + IoT gateway | Raspberry Pi 4 Model B (4 GB) | Python 3.11, `firebase-admin`, `pyserial`, TensorFlow Lite | Image capture, CNN inference, UART ↔ Firebase bridge |
 | Cloud persistence | Firebase RTDB + Cloud Storage | Firebase JS/Admin SDK | Telemetry store, command queue, image hosting |
 | Mobile HMI | Android / iOS | Flutter (Dart 3) + Material 3 | Dashboard, actuator control, AI monitor, alerts, voice command |
 | Mechanical | Custom 3D-printed gantry | OpenSCAD source + STL | Linear motion, instrumentation mount, electronics enclosure |
 
-> **Note on the original architecture.** The course-level plan called for a
-> three-MCU stack (PIC + ESP8266 + Raspberry Pi). The current implementation
-> consolidates the ESP8266 role into the Raspberry Pi, which acts as a single
-> network-attached gateway over `/dev/ttyAMA0`. The ESP8266 firmware tree has
-> therefore been retired and the corresponding folder is no longer maintained.
+> **Note on the actuator topology.** The pump can be driven through two
+> independent paths. The **wired path** routes commands over UART
+> (App → Firebase → Pi → PIC → relay on `RD0`) and is gated by the on-board
+> safety FSM. The **wireless path** routes commands directly to an ESP8266
+> NodeMCU that polls Firebase at `/esp/pump/state` and toggles its own relay
+> on `D1` for a fixed 5-second cycle. Both paths can coexist on the same
+> physical pump or drive separate solenoids; the ESP path is intended as a
+> fast, low-latency override for app-initiated watering and for resilience
+> when the Pi bridge is offline.
 
 ---
 
@@ -64,7 +69,7 @@ single, gate-driven engineering process.
 │        │                    │                   │           │                │
 │        ▼                    ▼                   ▼           ▼                │
 │  Pump relay (12 V)     A4988 + NEMA17       Buzzer +     16×2 LCD            │
-│                        stepper gantry       LEDs                             │
+│  (wired path, RD0)     stepper gantry       LEDs                             │
 └──────────────────────────────┬───────────────────────────────────────────────┘
                                │ UART 9600-8N1
                                │ (custom framed protocol, §6)
@@ -78,16 +83,27 @@ single, gate-driven engineering process.
                                ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                       FIREBASE  (RTDB + Storage)                             │
-│   /sensors  /status  /commands  /ai  /alerts                                 │
-└──────────────────────────────┬───────────────────────────────────────────────┘
-                               │ Firebase Realtime listeners
-                               ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                FLUTTER MOBILE CLIENT  (Android / iOS)                        │
-│   Landing → Dashboard → Controls → AI Monitor → Alerts                       │
-│   STT mic (voice command), local notifications                               │
-└──────────────────────────────────────────────────────────────────────────────┘
+│   /sensors  /status  /commands  /ai  /alerts  /esp/pump/state                │
+└──────┬───────────────────────┬───────────────────────────────────────────────┘
+       │ Firebase listener     │ 1 Hz poll on /esp/pump/state
+       ▼                       ▼
+┌─────────────────────────┐   ┌─────────────────────────────────────────────┐
+│  FLUTTER MOBILE CLIENT  │   │           ESP8266 NodeMCU v3                │
+│  (Android / iOS)        │   │   Wi-Fi → Firebase_ESP_Client                │
+│  Landing → Dashboard →  │   │   D1 relay → wireless pump (5 s cycle,       │
+│  Controls → AI Monitor  │   │            self-clears node on completion)   │
+│  → Alerts (STT mic)     │   └─────────────────────────────────────────────┘
+└─────────────────────────┘
 ```
+
+**Two actuator paths to the pump:**
+
+* **Wired path** — Flutter writes a `commands/pump` node → the Pi bridge
+  consumes it → encodes a `0xBB 0x04` UART frame → PIC validates against the
+  safety FSM → drives the relay on `RD0` for `PUMP_ON_TICKS × 100 ms`.
+* **Wireless path** — Flutter writes `/esp/pump/state = "ON"` → the ESP8266
+  picks it up within ≤ 1 s on its polling loop → energises its own relay on
+  `D1` for `PUMP_ON_MS = 5000 ms` → resets the node to `"OFF"`.
 
 ---
 
@@ -103,6 +119,9 @@ smart-irrigation/
 │   ├── include/          Cross-module headers (frame defs, pin maps)
 │   ├── config.h          Central configuration (clock, thresholds, pin map, timing)
 │   └── cmake/, _build/   Out-of-tree build helpers
+│
+├── esp-firmware/         ESP8266 NodeMCU pump actuator (Stream C)
+│   └── esp.ino           Arduino sketch: Wi-Fi + Firebase polling + relay
 │
 ├── pi-script/            Raspberry Pi bridge daemon (Stream B)
 │   ├── pi_controller.py  UART ⇄ Firebase main bridge
@@ -335,7 +354,63 @@ deployment.
 
 ---
 
-## 8. Firebase RTDB Schema
+## 8. ESP8266 Wireless Pump Actuator (`esp-firmware/`)
+
+The ESP8266 NodeMCU v3 runs an Arduino sketch (`esp.ino`) that joins the
+campus / hotspot Wi-Fi, signs into the same Firebase project used by the app
+and the Pi, and polls a single RTDB node for pump commands.
+
+| Aspect | Value |
+|--------|-------|
+| Board | ESP8266 NodeMCU v3 |
+| Toolchain | Arduino IDE / Arduino CLI, ESP8266 core, `Firebase_ESP_Client` |
+| Relay pin | `D1` (GPIO 5), active-LOW |
+| Polled node | `/esp/pump/state` (string: `"ON"` / `"OFF"`) |
+| Poll cadence | 1 Hz (`POLL_INTERVAL_MS = 1000`) |
+| Pump-on duration | 5 s (`PUMP_ON_MS = 5000`) — matches `PUMP_ON_TICKS × 100 ms` on the PIC |
+| Auto-clear | Node is reset to `"OFF"` after each cycle |
+| Wi-Fi watchdog | Reconnect attempts on `WL_CONNECTED` loss (10 s budget) |
+| Sources of commands | Flutter app (`Controls` tab) and the Pi bridge (forwarded from voice / scheduler) |
+
+**Control flow:**
+
+```
+Flutter / Pi  ──set──▶  /esp/pump/state = "ON"
+                                 │
+                                 ▼
+                        ESP8266 poll loop (1 Hz)
+                                 │
+                          state == "ON" ?
+                                 │
+                                 ▼
+                  relay LOW → pump ON  (5 000 ms)
+                                 │
+                                 ▼
+                  relay HIGH → pump OFF
+                                 │
+                                 ▼
+                set /esp/pump/state = "OFF"  (idempotent latch)
+```
+
+**Build & flash:**
+
+```bash
+# Install ESP8266 board support + Firebase_ESP_Client library in the Arduino IDE
+# Open esp-firmware/esp.ino
+# Edit WIFI_SSID, WIFI_PASSWORD, API_KEY, DATABASE_URL to match your project
+# Select board: NodeMCU 1.0 (ESP-12E Module), upload speed 115200, port = NodeMCU
+# Sketch → Upload
+```
+
+**Security note.** The reference sketch stores Wi-Fi and Firebase credentials
+as string literals for laboratory demonstration. For production deployment,
+move secrets into a separate `secrets.h` excluded from version control and
+enable Firebase RTDB rules that restrict `/esp/pump/state` to authenticated
+writes.
+
+---
+
+## 9. Firebase RTDB Schema
 
 ```
 sensors/
@@ -377,6 +452,10 @@ ai/
 
 alerts/
   history/{id}/         message, severity, timestamp
+
+esp/
+  pump/
+    state               string  "ON" | "OFF"   (consumed by the ESP8266 node)
 ```
 
 `sensors/*` and `status/*` are read-only for the mobile client; all operator
@@ -384,7 +463,7 @@ actions are expressed as `commands/*` writes that the Pi bridge consumes.
 
 ---
 
-## 9. Mobile Client (`flutter-app/`)
+## 10. Mobile Client (`flutter-app/`)
 
 A Flutter (Dart 3) application targeting Android (primary, APK shipped) and
 iOS. Architecture: a single `firebase_service.dart` exposes every read stream
@@ -413,7 +492,7 @@ The AI model emits one of six classes; their colour mapping lives in
 
 ---
 
-## 10. Machine-Learning Pipeline (`ml-pipeline/`)
+## 11. Machine-Learning Pipeline (`ml-pipeline/`)
 
 | Aspect | Value |
 |--------|-------|
@@ -435,7 +514,7 @@ The notebook produces a full evaluation: training curves, per-class precision
 
 ---
 
-## 11. Mechanical Subsystem (`mechanical/`)
+## 12. Mechanical Subsystem (`mechanical/`)
 
 The gantry is a single-axis linear stage executed in 3D-printed PLA on an
 aluminium 2020 V-slot frame. Six OpenSCAD parts compose the assembly:
@@ -456,9 +535,9 @@ LM8UU linear bearings, GT2 belt + 20 T pulley, NEMA17 stepper.
 
 ---
 
-## 12. Build, Flash, and Run
+## 13. Build, Flash, and Run
 
-### 12.1 PIC firmware
+### 13.1 PIC firmware
 
 ```bash
 # In MPLAB X IDE
@@ -470,7 +549,7 @@ Build → Make and Program Device
 The golden HEX is checked in at `default.hex` for evaluators without a build
 toolchain.
 
-### 12.2 Raspberry Pi bridge
+### 13.2 Raspberry Pi bridge
 
 ```bash
 cd pi-script
@@ -490,7 +569,18 @@ Edit `pi_controller.py` to point `FIREBASE_CRED`, `FIREBASE_DB_URL`, and
 `FIREBASE_BUCKET` at your project, then drop the service-account JSON at the
 path given by `FIREBASE_CRED`.
 
-### 12.3 Inference layer
+### 13.3 ESP8266 firmware
+
+```bash
+# Arduino IDE: Board Manager → install "esp8266" core
+# Library Manager → install "Firebase Arduino Client Library for ESP8266 and ESP32"
+# Open esp-firmware/esp.ino, edit the credential macros, then Upload.
+# Or via Arduino CLI:
+arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 esp-firmware/esp.ino
+arduino-cli upload  --fqbn esp8266:esp8266:nodemcuv2 -p COMx esp-firmware/esp.ino
+```
+
+### 13.4 Inference layer
 
 ```bash
 cd pi-ai/Capture_camera
@@ -501,7 +591,7 @@ chmod +x capture_and_infer.sh
 The Docker variant under `pi-ai/Irrigation system/Docker_files` provides a
 reproducible runtime if Pi OS package versions drift.
 
-### 12.4 Mobile client
+### 13.5 Mobile client
 
 ```bash
 cd flutter-app
@@ -515,7 +605,7 @@ flutter test               # unit + widget tests
 `lib/firebase_options.dart` is generated locally with `flutterfire configure`
 and is git-ignored.
 
-### 12.5 ML training
+### 13.6 ML training
 
 ```bash
 cd ml-pipeline
@@ -525,11 +615,12 @@ jupyter notebook "notebooks/Model (1).ipynb"
 
 ---
 
-## 13. Hardware Bill of Materials (selected)
+## 14. Hardware Bill of Materials (selected)
 
 | Block | Component | Notes |
 |-------|-----------|-------|
 | MCU | PIC16F877A-I/P | 8 MHz HS crystal + 2 × 22 pF |
+| Wi-Fi node | ESP8266 NodeMCU v3 + 5 V relay module on `D1` | Shares Firebase project with the Pi |
 | Edge AI | Raspberry Pi 4 Model B (4 GB) + Pi Camera v2 | Active cooling recommended |
 | Sensors | Capacitive soil v1.2, DHT11, ACS712-05B, HC-SR04 | All 5 V tolerant |
 | Actuation | NEMA17 (JK42HS40), A4988 driver, 12 V DC pump, 2-ch SRD relay | Common ground with logic |
@@ -541,7 +632,7 @@ A full BOM with vendor links is included in `Report and Feasibilty Study/`.
 
 ---
 
-## 14. Course Milestones
+## 15. Course Milestones
 
 | Gate | Criterion | Target |
 |------|-----------|--------|
@@ -558,7 +649,7 @@ Per-stream gate ownership and mitigation paths are tabulated in
 
 ---
 
-## 15. References
+## 16. References
 
 1. Microchip Technology, *PIC16F87XA Data Sheet*, DS39582.
 2. Allegro MicroSystems, *ACS712 Fully Integrated, Hall-Effect-Based Linear
@@ -581,4 +672,4 @@ Per-stream gate ownership and mitigation paths are tabulated in
 ## 17. License
 
 Released under the MIT License. See `LICENSE` if present, otherwise
-distribute under the terms reproduced in §15 of the course handbook.
+distribute under the terms reproduced in the course handbook.

@@ -3,13 +3,11 @@
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
-// ─── WiFi Credentials ────────────────────────────────────────
-#define WIFI_SSID     "Abdullah's Galaxy A52s 5G"
-#define WIFI_PASSWORD "A7a12347"
-
-// ─── Firebase Credentials ────────────────────────────────────
-#define API_KEY      "AIzaSyBdnBbVYOYoykE8aXM9tKAg0Jw94rq11P8"
-#define DATABASE_URL "https://embedded-project-32dca-default-rtdb.firebaseio.com/"
+// ─── Credentials ─────────────────────────────────────────────
+// Real values live in secrets.h (gitignored). Copy secrets.copy.h to
+// secrets.h and fill it in before building. Macros expected:
+//   WIFI_SSID, WIFI_PASSWORD, API_KEY, DATABASE_URL
+#include "secrets.h"
 
 // ─── Pin & Timing ────────────────────────────────────────────
 #define PUMP_RELAY       D1
