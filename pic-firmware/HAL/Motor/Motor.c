@@ -14,22 +14,25 @@
 #include "../../config.h"
 #include "Motor_interface.h"
 #include "../Button/Button_interface.h"
+#include "../../APP/Comms/Comms_interface.h"
 #include "../../MCAL/MCU_Registers.h"
 #include "../../SERVICES/BIT_MATH.h"
 #include "../../SERVICES/STD_TYPES.h"
 
+#define STEPS_PER_CM 800u
+
 static s32 current_position = 0;
 
-/* 2 plants, 10 cm apart.
-   Plant 0:  4000 steps (~5 cm from home)
-   Plant 1: 12000 steps (10 cm further)       */
-static const u32 plant_positions[NUM_PLANTS] = {4000u, 12000u};
+/* 2 plants. 1 step = 0.0125 mm → 1 cm = 800 steps.
+   Plant 0:  2400 steps (3  cm from home)
+   Plant 1: 10400 steps (13 cm from home, 10 cm gap)  */
+static const u32 plant_positions[NUM_PLANTS] = {2400u, 10400u};
 
 void Motor_Init(void)
 {
     CLR_BIT(PORTC, PIN_STEP);
     CLR_BIT(PORTC, PIN_DIR);
-    SET_BIT(PORTC, PIN_ENABLE);   /* A4988 disabled at startup */
+    SET_BIT(PORTC, PIN_ENABLE); /* A4988 disabled at startup */
     current_position = 0;
 }
 
@@ -58,22 +61,28 @@ void Motor_Home(void)
     u32 backoff;
     u16 poll_cnt = 0u;
 
-    CLR_BIT(PORTC, PIN_ENABLE);   /* enable A4988 */
-    CLR_BIT(PORTC, PIN_DIR);      /* DIR LOW = toward home */
+    CLR_BIT(PORTC, PIN_ENABLE); /* enable A4988 */
+    CLR_BIT(PORTC, PIN_DIR);    /* DIR LOW = toward home */
 
-    while(GET_BIT(PORTB, PIN_LIMIT))
+    while (GET_BIT(PORTB, PIN_LIMIT))
     {
         step_once_homing();
         poll_cnt++;
-        if((poll_cnt & 0x31u) == 0u) {
+        if ((poll_cnt & 0x31u) == 0u)
+        {
             Button_Poll();
-            if(Button_IsEstopped()) { Motor_Disable(); return; }
+            if (Button_IsEstopped())
+            {
+                Motor_Disable();
+                return;
+            }
         }
     }
 
     /* Back off from limit switch */
     SET_BIT(PORTC, PIN_DIR);
-    for(backoff = 0u; backoff < HOMING_BACKOFF_STEPS; backoff++) {
+    for (backoff = 0u; backoff < HOMING_BACKOFF_STEPS; backoff++)
+    {
         step_once_homing();
     }
 
@@ -87,31 +96,53 @@ void Motor_MoveTo(u8 plant_index)
     u32 steps;
     u16 poll_cnt = 0u;
 
-    if(plant_index >= NUM_PLANTS) return;
+    if (plant_index >= NUM_PLANTS)
+        return;
 
     target = (s32)plant_positions[plant_index];
-    delta  = target - current_position;
-    steps  = (delta < 0) ? (u32)(-delta) : (u32)delta;
+    delta = target - current_position;
+    steps = (delta < 0) ? (u32)(-delta) : (u32)delta;
 
     CLR_BIT(PORTC, PIN_ENABLE);
 
-    if(delta > 0) SET_BIT(PORTC, PIN_DIR);
-    else          CLR_BIT(PORTC, PIN_DIR);
+    if (delta > 0)
+        SET_BIT(PORTC, PIN_DIR);
+    else
+        CLR_BIT(PORTC, PIN_DIR);
 
-    while(steps > 0u)
+    while (steps > 0u)
     {
         step_once_normal();
         steps--;
         current_position += (delta > 0) ? 1 : -1;
         poll_cnt++;
-        if((poll_cnt % 50u) == 0u) {
+        if ((poll_cnt % 25u) == 0u)
+        {
             Button_Poll();
-            if(Button_IsEstopped()) { Motor_Disable(); return; }
+            Comms_Poll();
+            if (Button_IsEstopped() || Comms_AppEstopActive())
+            {
+                Motor_Disable();
+                return;
+            }
         }
     }
 }
 
 void Motor_Disable(void)
 {
-    SET_BIT(PORTC, PIN_ENABLE);   /* A4988 ENABLE HIGH = free shaft */
+    SET_BIT(PORTC, PIN_ENABLE); /* A4988 ENABLE HIGH = free shaft */
+}
+
+u8 Motor_GetPositionCm(void)
+{
+    s32 p = current_position;
+    if (p < 0)
+        p = -p;
+    return (u8)(((u32)p + (STEPS_PER_CM / 2u)) / STEPS_PER_CM);
+}
+
+s32 Motor_GetPositionSteps(void)
+{
+    return current_position;
 }

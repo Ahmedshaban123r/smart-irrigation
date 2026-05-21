@@ -15,4 +15,10 @@ void Motor_Home(void);
 void Motor_MoveTo(u8 plant_index);
 void Motor_Disable(void);
 
+/* Current carriage position in cm from home (rounded). */
+u8 Motor_GetPositionCm(void);
+
+/* Raw step count from home (signed, can be 0..~12000). */
+s32 Motor_GetPositionSteps(void);
+
 #endif /* MOTOR_INTERFACE_H */

@@ -34,19 +34,63 @@ static void pump_off(void)
     PORTD = portd_shadow;
 }
 
+void Irrigation_PumpOnAt(u8 plant_index)
+{
+    u8 j;
+    if (plant_index >= NUM_PLANTS)
+        return;
+
+    LCD_GoToRowCol(1u, 1u);
+    LCD_SendString_Const("Manual P");
+    LCD_SendNumber((s16)plant_index);
+    LCD_SendString_Const(" ON     ");
+
+    Motor_Home();
+    if (Button_IsEstopped() || Comms_AppEstopActive() || Safety_IsLocked())
+    {
+        Motor_Disable();
+        return;
+    }
+    Motor_MoveTo(plant_index);
+    Motor_Disable();
+    if (Button_IsEstopped() || Comms_AppEstopActive() || Safety_IsLocked())
+        return;
+
+    for (j = 0u; j < SETTLE_MS_LOOP; j++)
+    {
+        __delay_ms(100);
+    }
+    Comms_SendAtPlant(plant_index);
+    pump_on();
+}
+
+void Irrigation_PumpOff(void)
+{
+    pump_off();
+    Motor_Disable();
+    LCD_GoToRowCol(1u, 1u);
+    LCD_SendString_Const("Manual Pump OFF ");
+}
+
 static u8 estopped(void)
 {
     return (u8)(Button_IsEstopped() || Comms_AppEstopActive());
+}
+
+/* True if user toggled to MANUAL via app while we were running auto. */
+static u8 mode_left_auto(void)
+{
+    return (u8)(Comms_GetMode() != MODE_AUTO);
 }
 
 /* Inner pump loop shared by both modes.
    Returns 1 if aborted (locked/estopped), 0 if completed normally. */
 static u8 run_pump(u8 plant_index)
 {
-    u8  pump_ticks = 0u;
-    u8  soil;
+    u8 pump_ticks = 0u;
+    u8 soil;
     u16 curr;
-    u8  water;
+    u8 water;
 
     pump_on();
     LCD_GoToRowCol(1u, 1u);
@@ -54,23 +98,25 @@ static u8 run_pump(u8 plant_index)
     LCD_SendNumber((s16)plant_index);
     LCD_SendString_Const("      ");
 
-    while(pump_ticks < PUMP_ON_TICKS)
+    while (pump_ticks < PUMP_ON_TICKS)
     {
         __delay_ms(100);
         Button_Poll();
         Comms_Poll();
 
-        if(estopped() || Safety_IsLocked()) {
+        if (estopped() || Safety_IsLocked() || mode_left_auto())
+        {
             pump_off();
             return 1u;
         }
 
-        soil  = ADC_SoilPct(ADC_Read(ADC_CH_SOIL));
-        curr  = ADC_CurrentmA(ADC_Read(ADC_CH_CURRENT));
+        soil = ADC_SoilPct(ADC_Read(ADC_CH_SOIL));
+        curr = ADC_CurrentmA(ADC_Read(ADC_CH_CURRENT));
         water = Ultrasonic_GetWaterLevel();
         Safety_RunChecks(soil, last_temp_c, curr, water);
 
-        if(Safety_IsLocked()) {
+        if (Safety_IsLocked())
+        {
             pump_off();
             return 1u;
         }
@@ -92,7 +138,8 @@ void Irrigation_RunCycle(void)
 
     /* Skip if soil already wet enough */
     soil = ADC_SoilPct(ADC_Read(ADC_CH_SOIL));
-    if(soil >= SOIL_SKIP_PCT) {
+    if (soil >= SOIL_SKIP_PCT)
+    {
         LCD_GoToRowCol(1u, 1u);
         LCD_SendString_Const("Soil OK-Skipping");
         return;
@@ -102,23 +149,35 @@ void Irrigation_RunCycle(void)
     LCD_GoToRowCol(1u, 1u);
     LCD_SendString_Const("Homing...       ");
     Motor_Home();
-    if(estopped() || Safety_IsLocked()) goto abort;
+    if (estopped() || Safety_IsLocked())
+        goto abort;
 
     /* Irrigate each plant */
-    for(i = 0u; i < NUM_PLANTS; i++)
+    for (i = 0u; i < NUM_PLANTS; i++)
     {
         Motor_MoveTo(i);
-        if(estopped() || Safety_IsLocked()) goto abort;
+        if (estopped() || Safety_IsLocked() || mode_left_auto())
+            goto abort;
 
         /* Settle */
-        for(j = 0u; j < SETTLE_MS_LOOP; j++) { __delay_ms(100); }
+        for (j = 0u; j < SETTLE_MS_LOOP; j++)
+        {
+            __delay_ms(100);
+            Comms_Poll();
+        }
+        if (mode_left_auto())
+            goto abort;
 
         Comms_SendAtPlant(i);
 
-        if(run_pump(i)) goto abort;
+        if (run_pump(i))
+            goto abort;
 
         /* Short pause between plants */
-        for(j = 0u; j < 5u; j++) { __delay_ms(100); }
+        for (j = 0u; j < 5u; j++)
+        {
+            __delay_ms(100);
+        }
     }
 
     Motor_Home();
@@ -134,7 +193,8 @@ void Irrigation_RunSinglePlant(u8 plant_index)
 {
     u8 j;
 
-    if(plant_index >= NUM_PLANTS) return;
+    if (plant_index >= NUM_PLANTS)
+        return;
 
     LCD_GoToRowCol(1u, 1u);
     LCD_SendString_Const("Manual: P");
@@ -142,16 +202,22 @@ void Irrigation_RunSinglePlant(u8 plant_index)
     LCD_SendString_Const("       ");
 
     Motor_Home();
-    if(estopped() || Safety_IsLocked()) goto abort;
+    if (estopped() || Safety_IsLocked())
+        goto abort;
 
     Motor_MoveTo(plant_index);
-    if(estopped() || Safety_IsLocked()) goto abort;
+    if (estopped() || Safety_IsLocked())
+        goto abort;
 
-    for(j = 0u; j < SETTLE_MS_LOOP; j++) { __delay_ms(100); }
+    for (j = 0u; j < SETTLE_MS_LOOP; j++)
+    {
+        __delay_ms(100);
+    }
 
     Comms_SendAtPlant(plant_index);
 
-    if(run_pump(plant_index)) goto abort;
+    if (run_pump(plant_index))
+        goto abort;
 
     Motor_Home();
     Motor_Disable();

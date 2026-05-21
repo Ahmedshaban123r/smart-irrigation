@@ -36,10 +36,10 @@
  * portd_shadow — RD0 = pump relay (active LOW, pump OFF = 1).
  * Starting at 0x01 keeps E/RS/D4-D7 LOW so LCD_Init gets a clean start.
  */
-volatile u8 portd_shadow = 0x01u;
+volatile u8 portd_shadow = 0x00u;
 u8 last_temp_c = 25u;
 volatile u8 g_tick_100ms = 0u;
-u8 g_frame[4]  = {0u};
+u8 g_frame[4] = {0u};
 u8 g_frame_idx = 0u;
 u8 g_frame_ready = 0u;
 
@@ -57,6 +57,7 @@ u8 g_frame_ready = 0u;
 #include "../HAL/Fan/Fan_interface.h"
 #include "../HAL/Humidity/Humidity_interface.h"
 #include "../HAL/Ultrasonic/Ultrasonic_interface.h"
+#include "../HAL/Motor/Motor_interface.h"
 #include "../MCAL/ADC/ADC_interface.h"
 #include "../MCAL/USART/USART_interface.h"
 
@@ -130,11 +131,53 @@ void main(void)
         new_mode = Comms_GetMode();
         if (new_mode != current_mode)
         {
+            u8 was_auto = (u8)(current_mode == MODE_AUTO);
             current_mode = new_mode;
+
+            /* Force-stop any auto activity when leaving AUTO */
+            if (was_auto && current_mode == MODE_MANUAL) {
+                u8 pos = Motor_GetPositionCm();
+                portd_shadow |= (u8)(1u << PIN_PUMP);
+                PORTD = portd_shadow;
+                LCD_GoToRowCol(1u, 1u);
+                LCD_SendString_Const("AUTO->MAN at ");
+                LCD_SendNumber((s16)pos);
+                LCD_SendString_Const("cm");
+                LCD_GoToRowCol(2u, 1u);
+                LCD_SendString_Const("Homing...       ");
+                Motor_Home();
+                Motor_Disable();
+                tick = 0u;
+            }
+
             Comms_SendStatus(current_mode, Safety_IsLocked());
             LCD_GoToRowCol(2u, 1u);
             LCD_SendString_Const(current_mode == MODE_AUTO ? "Auto Mode OK    "
                                                             : "Manual Mode     ");
+        }
+
+        /* Estop edge — show pos, home, hold until released */
+        if (Button_IsEstopped() || Comms_AppEstopActive())
+        {
+            u8 pos = Motor_GetPositionCm();
+            portd_shadow |= (u8)(1u << PIN_PUMP);
+            PORTD = portd_shadow;
+            LCD_GoToRowCol(1u, 1u);
+            LCD_SendString_Const("ESTOP at ");
+            LCD_SendNumber((s16)pos);
+            LCD_SendString_Const("cm   ");
+            LCD_GoToRowCol(2u, 1u);
+            LCD_SendString_Const("Home + wait     ");
+            Motor_Home();
+            Motor_Disable();
+            while (Button_IsEstopped() || Comms_AppEstopActive()) {
+                __delay_ms(100);
+                Button_Poll();
+                Comms_Poll();
+            }
+            LCD_GoToRowCol(2u, 1u);
+            LCD_SendString_Const("Resumed         ");
+            tick = 0u;
         }
 
         if (current_mode == MODE_MANUAL && Comms_ManualCommandPending())
@@ -143,6 +186,26 @@ void main(void)
             Comms_ClearManualCommand();
             if (!Safety_IsLocked() && !Button_IsEstopped() && !Comms_AppEstopActive())
                 Irrigation_RunSinglePlant(plant);
+        }
+
+        /* Manual pump on/off from app (esp/pump cmd via Pi) */
+        if (current_mode == MODE_MANUAL && Comms_PumpCommandPending())
+        {
+            u8 pstate = Comms_GetPumpState();
+            u8 pplant = Comms_GetPumpPlant();
+            Comms_ClearPumpCommand();
+            if (pstate == 0u) {
+                Irrigation_PumpOff();
+            } else if (!Safety_IsLocked() && !Button_IsEstopped() && !Comms_AppEstopActive()) {
+                Irrigation_PumpOnAt(pplant);
+            }
+        }
+
+        /* Safety override: kill pump if locked/estopped while manually on */
+        if (Safety_IsLocked() || Button_IsEstopped() || Comms_AppEstopActive())
+        {
+            portd_shadow |= (u8)(1u << PIN_PUMP);
+            PORTD = portd_shadow;
         }
 
         /* Sensor read every 2 s */
@@ -192,8 +255,7 @@ void main(void)
     }
 }
 
-#endif  /* SECTION 1 — PRODUCTION MAIN */
-
+#endif /* SECTION 1 — PRODUCTION MAIN */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SECTION 2 — DEBUG MAIN  (active — flip to #if 0 when going to production)
@@ -212,35 +274,142 @@ void main(void)
 #include "../MCAL/USART/USART_interface.h"
 
 /* Time given to Pi to capture image and upload to Firebase */
-#define PI_PHOTO_WAIT_TICKS  200u  /* 200 × 100 ms = 20 s */
+#define PI_PHOTO_WAIT_TICKS 200u /* 200 × 100 ms = 20 s */
+
+static u8 estop_now(void)
+{
+    Button_Poll();
+    Comms_Poll();
+    return (u8)(Button_IsEstopped() || Comms_AppEstopActive());
+}
+
+static void handle_estop(void)
+{
+    u8 pos_cm = Motor_GetPositionCm();
+
+    LCD_Clear();
+    LCD_GoToRowCol(1u, 1u);
+    LCD_SendString_Const("E-STOP at ");
+    LCD_SendNumber((s16)pos_cm);
+    LCD_SendString_Const("cm   ");
+    LCD_GoToRowCol(2u, 1u);
+    LCD_SendString_Const("Stopping...     ");
+
+    {
+        u8 s;
+        for (s = 0u; s < 10u; s++)
+        {
+            __delay_ms(100);
+        }
+    }
+
+    LCD_GoToRowCol(2u, 1u);
+    LCD_SendString_Const("Reset motor->0  ");
+    Motor_Home();
+    Motor_Disable();
+
+    LCD_GoToRowCol(2u, 1u);
+    LCD_SendString_Const("At home. Waiting");
+
+    /* Wait until both estop sources clear (hw button toggle / app release) */
+    while (1)
+    {
+        __delay_ms(100);
+        Button_Poll();
+        Comms_Poll();
+        if (!Button_IsEstopped() && !Comms_AppEstopActive())
+            break;
+    }
+
+    LCD_Clear();
+    LCD_GoToRowCol(1u, 1u);
+    LCD_SendString_Const("Resumed         ");
+    {
+        u8 s;
+        for (s = 0u; s < 10u; s++)
+        {
+            __delay_ms(100);
+        }
+    }
+}
+
+/* Render row 1 with one of 5 sensor pages. Page cycles every PAGE_TICKS. */
+#define PAGE_TICKS 40u /* 40 × 100 ms = 4 s per page → 5 pages in 20 s */
+
+static void render_sensor_page(u8 plant_idx, u8 page,
+                               u8 soil, u8 temp, u8 hum, u16 curr, u8 water)
+{
+    LCD_GoToRowCol(1u, 1u);
+    LCD_SendString_Const("P");
+    LCD_SendNumber((s16)plant_idx);
+    LCD_SendString_Const(" ");
+    switch (page % 5u)
+    {
+    case 0u:
+        LCD_SendString_Const("Soil:");
+        LCD_SendNumber((s16)soil);
+        LCD_SendString_Const("%        ");
+        break;
+    case 1u:
+        LCD_SendString_Const("Temp:");
+        LCD_SendNumber((s16)temp);
+        LCD_SendString_Const("C        ");
+        break;
+    case 2u:
+        LCD_SendString_Const("Hum:");
+        LCD_SendNumber((s16)hum);
+        LCD_SendString_Const("%         ");
+        break;
+    case 3u:
+        LCD_SendString_Const("Cur:");
+        LCD_SendNumber((s16)curr);
+        LCD_SendString_Const("mA     ");
+        break;
+    case 4u:
+        LCD_SendString_Const("Wtr:");
+        LCD_SendNumber((s16)water);
+        LCD_SendString_Const("cm        ");
+        break;
+    default:
+        break;
+    }
+}
 
 static void read_and_signal(u8 plant_idx)
 {
-    u8  soil, humidity, water;
+    u8 soil, humidity, water;
     u16 curr;
+    u8 t, page = 0u;
 
-    soil     = ADC_SoilPct(ADC_Read(ADC_CH_SOIL));
-    curr     = ADC_CurrentmA(ADC_Read(ADC_CH_CURRENT));
-    water    = Ultrasonic_GetWaterLevel();
+    soil = ADC_SoilPct(ADC_Read(ADC_CH_SOIL));
+    curr = ADC_CurrentmA(ADC_Read(ADC_CH_CURRENT));
+    water = Ultrasonic_GetWaterLevel();
     Humidity_Read(&humidity, &last_temp_c);
 
     /* Send sensor packet then trigger Pi camera */
     Comms_SendSensors(soil, last_temp_c, humidity, curr, water);
     Comms_SendAtPlant(plant_idx);
 
-    /* Show readings while Pi uploads */
-    LCD_GoToRowCol(1u, 1u);
-    LCD_SendString_Const("P");
-    LCD_SendNumber((s16)plant_idx);
-    LCD_SendString_Const(" S:");
-    LCD_SendNumber((s16)soil);
-    LCD_SendString_Const("% T:");
-    LCD_SendNumber((s16)last_temp_c);
-    LCD_SendString_Const("C   ");
     LCD_GoToRowCol(2u, 1u);
     LCD_SendString_Const("Pi: uploading...");
 
-    { u8 t; for (t = 0u; t < PI_PHOTO_WAIT_TICKS; t++) { __delay_ms(100); } }
+    render_sensor_page(plant_idx, page, soil, last_temp_c, humidity, curr, water);
+
+    for (t = 0u; t < PI_PHOTO_WAIT_TICKS; t++)
+    {
+        __delay_ms(100);
+        if (estop_now())
+        {
+            handle_estop();
+            return;
+        }
+        if (((t + 1u) % PAGE_TICKS) == 0u)
+        {
+            page++;
+            render_sensor_page(plant_idx, page, soil, last_temp_c,
+                               humidity, curr, water);
+        }
+    }
 }
 
 void main(void)
@@ -250,12 +419,12 @@ void main(void)
 
     /* ── Port config ── */
     ADCON1 = ADCON1_CONFIG;
-    TRISA  = 0x07u;
-    PORTB  = 0x00u;
-    TRISB  = 0b00011011u;
-    TRISC  = 0b10000000u;   /* RC7 = UART RX input */
-    TRISD  = 0x00u;
-    TRISE  = 0x00u;
+    TRISA = 0x07u;
+    PORTB = 0x00u;
+    TRISB = 0b00011011u;
+    TRISC = 0b10000000u; /* RC7 = UART RX input */
+    TRISD = 0x00u;
+    TRISE = 0x00u;
     CLR_BIT(OPTION_REG, 7u);
 
     PORTD = portd_shadow;
@@ -264,7 +433,7 @@ void main(void)
     CLR_BIT(PORTC, PIN_DIR);
     CLR_BIT(PORTC, PIN_STEP);
     CLR_BIT(PORTC, PIN_FAN);
-    SET_BIT(PORTC, 6u);         /* UART TX idle HIGH */
+    SET_BIT(PORTC, 6u); /* UART TX idle HIGH */
     CLR_BIT(PORTB, PIN_BUZZ);
     CLR_BIT(PORTE, PIN_LED_YLW);
     CLR_BIT(PORTE, PIN_LED_RED);
@@ -276,21 +445,46 @@ void main(void)
     Humidity_Init();
     Motor_Init();
 
-    LCD_GoToRowCol(1u, 1u); LCD_SendString_Const("Debug: Sense+   ");
-    LCD_GoToRowCol(2u, 1u); LCD_SendString_Const("Photo Pipeline  ");
-    { u8 s; for (s = 0u; s < 20u; s++) { __delay_ms(100); } }  /* 2 s splash */
+    LCD_GoToRowCol(1u, 1u);
+    LCD_SendString_Const("Debug: Sense+   ");
+    LCD_GoToRowCol(2u, 1u);
+    LCD_SendString_Const("Photo Pipeline  ");
+    {
+        u8 s;
+        for (s = 0u; s < 20u; s++)
+        {
+            __delay_ms(100);
+        }
+    } /* 2 s splash */
 
     while (1)
     {
-        /* Move 5 cm to next plant */
+        /* Estop check before move */
+        if (estop_now())
+        {
+            handle_estop();
+            plant_idx = 0u;
+            continue;
+        }
+
+        /* Move to next plant. P0 = 3 cm from home, P1 = 13 cm (10 cm apart) */
         LCD_GoToRowCol(1u, 1u);
         LCD_SendString_Const("Moving -> P");
         LCD_SendNumber((s16)plant_idx);
         LCD_SendString_Const("    ");
         LCD_GoToRowCol(2u, 1u);
-        LCD_SendString_Const("5cm             ");
+        LCD_SendString_Const(plant_idx == 0u ? "to 3cm          "
+                                             : "to 13cm         ");
 
         Motor_MoveTo(plant_idx);
+        Motor_Disable();
+
+        if (estop_now())
+        {
+            handle_estop();
+            plant_idx = 0u;
+            continue;
+        }
 
         /* Read sensors, send to Pi, signal photo, wait for upload */
         read_and_signal(plant_idx);
@@ -300,4 +494,4 @@ void main(void)
     }
 }
 
-#endif  /* SECTION 2 — DEBUG MAIN */
+#endif /* SECTION 2 — DEBUG MAIN */

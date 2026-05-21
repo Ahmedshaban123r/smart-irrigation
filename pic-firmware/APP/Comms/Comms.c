@@ -22,6 +22,9 @@ static u8 manual_cmd_pending  = 0u;
 static u8 manual_plant        = 0u;
 static u8 app_estop           = 0u;
 static u8 handshake_received  = 0u;
+static u8 pump_cmd_pending    = 0u;
+static u8 pump_cmd_state      = 0u;   /* 1=ON, 0=OFF */
+static u8 pump_cmd_plant      = 0u;
 
 /* ── Outbound ── */
 
@@ -83,6 +86,11 @@ void Comms_Poll(void)
                 case UART_CMD_ESTOP:
                     app_estop = (byte != 0u) ? 1u : 0u;
                     break;
+                case UART_CMD_PUMP:
+                    pump_cmd_plant   = (u8)((byte >> 4) & 0x0Fu);
+                    pump_cmd_state   = (u8)(byte & 0x01u);
+                    if(pump_cmd_plant < NUM_PLANTS) pump_cmd_pending = 1u;
+                    break;
                 case UART_CMD_HANDSHAKE:
                     if(byte == 0xAAu) { handshake_received = 1u; }
                     break;
@@ -104,6 +112,11 @@ u8 Comms_GetManualPlant(void)       { return manual_plant; }
 u8 Comms_AppEstopActive(void)       { return app_estop; }
 u8 Comms_HandshakeReceived(void)    { return handshake_received; }
 void Comms_ClearManualCommand(void) { manual_cmd_pending = 0u; }
+
+u8   Comms_PumpCommandPending(void) { return pump_cmd_pending; }
+u8   Comms_GetPumpState(void)       { return pump_cmd_state; }
+u8   Comms_GetPumpPlant(void)       { return pump_cmd_plant; }
+void Comms_ClearPumpCommand(void)   { pump_cmd_pending = 0u; }
 
 void Comms_SendHandshakeAck(void)
 {

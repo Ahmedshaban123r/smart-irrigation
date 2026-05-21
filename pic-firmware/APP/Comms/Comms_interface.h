@@ -20,4 +20,10 @@ u8 Comms_HandshakeReceived(void);
 void Comms_ClearManualCommand(void);
 void Comms_SendHandshakeAck(void);
 
+/* Manual pump on/off command from Pi (app UI) */
+u8 Comms_PumpCommandPending(void);
+u8 Comms_GetPumpState(void);   /* 1=ON, 0=OFF */
+u8 Comms_GetPumpPlant(void);
+void Comms_ClearPumpCommand(void);
+
 #endif /* COMMS_INTERFACE_H */

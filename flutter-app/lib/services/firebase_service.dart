@@ -57,11 +57,20 @@ class FirebaseService {
       .onValue
       .map((e) => e.snapshot.value?.toString().toUpperCase() ?? 'OFF');
 
-// Gantry X position stream (X-axis only)
-  static Stream<int> get gantryX => _db
-      .ref('status/gantry_x')
-      .onValue
-      .map((e) => (e.snapshot.value as num?)?.toInt() ?? 0);
+// esp/pump live stream — single source of truth for pump+plant
+  static Stream<Map<String, dynamic>> get espPump =>
+      _db.ref('esp/pump').onValue.map((e) {
+        final val = e.snapshot.value as Map?;
+        if (val == null) return {'state': 'OFF', 'plant': 0, 'timestamp': 0};
+        return Map<String, dynamic>.from(val);
+      });
+
+  static Future<void> writeEspPump({required String state, required int plant}) =>
+      _db.ref('esp/pump').set({
+        'state': state,
+        'plant': plant,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
 
 // AI action log stream — sorted newest first
   static Stream<List<Map<String, dynamic>>> get actionLog =>
@@ -84,22 +93,25 @@ class FirebaseService {
         return Map<String, dynamic>.from(val);
       });
 
-// Write helpers — all app→hardware commands go through here
-  static Future<void> writePump(String state) => _db.ref('commands/pump').set({
-        'state': state,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'source': 'app',
-      });
-
-  static Future<void> writeGantryX(int x) =>
-      _db.ref('commands/gantry_move').set({
-        'x': x,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'source': 'app',
-      });
-
   static Future<void> writeEmergencyStop() =>
       _db.ref('commands/emergency_stop').set(true);
+
+  // Legacy shims — route through esp/pump (single source of truth)
+  static int _lastPlant = 0;
+
+  static Future<void> writePump(String state) =>
+      writeEspPump(state: state.toUpperCase(), plant: _lastPlant);
+
+  static Future<void> writeGantryX(int x) async {
+    // Map gantry mm -> plant index (P0 = 3cm, P1 = 13cm; midpoint = 80mm)
+    _lastPlant = x >= 80 ? 1 : 0;
+    await _db.ref('status/gantry_x').set(x);
+  }
+
+  static Stream<int> get gantryX => _db
+      .ref('status/gantry_x')
+      .onValue
+      .map((e) => (e.snapshot.value as num?)?.toInt() ?? 0);
 
   static Future<void> cancelAiProtocol() => Future.wait([
         _db.ref('commands/cancel_ai_protocol').set(true),
