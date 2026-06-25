@@ -1,0 +1,17 @@
+[Unit]
+Description=Smart Irrigation Exhibition Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=akai
+WorkingDirectory=/home/akai
+ExecStart=/home/akai/Final_Project/venv/bin/python /home/akai/Final_Project/pi_controller_exhibition.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
 import '../services/firebase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/mode_toggle_card.dart';
@@ -73,11 +72,10 @@ class _SystemStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DatabaseEvent>(
-      stream: FirebaseDatabase.instance.ref('status/system_state').onValue,
+    return StreamBuilder<String>(
+      stream: FirebaseService.systemState,
       builder: (context, snapshot) {
-        final systemState =
-            snapshot.data?.snapshot.value?.toString() ?? 'UNKNOWN';
+        final systemState = snapshot.data ?? 'UNKNOWN';
         return Card(
           child: ListTile(
             leading: Icon(
@@ -103,7 +101,7 @@ class _SystemStateCard extends StatelessWidget {
   }
 }
 
-// ── Manual Pump + Plant Card (writes to esp/pump) ─────────────────────────────
+// ── Manual Pump + Plant Card ─────────────────────────────────────────────────
 class _ManualPumpCard extends StatefulWidget {
   final bool isManual;
   const _ManualPumpCard({required this.isManual});
@@ -118,7 +116,7 @@ class _ManualPumpCardState extends State<_ManualPumpCard> {
 
   Future<void> _sendPump(String state, int plant) async {
     try {
-      await FirebaseService.writeEspPump(state: state, plant: plant);
+      await FirebaseService.writePumpAction(state: state, plant: plant);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -130,7 +128,7 @@ class _ManualPumpCardState extends State<_ManualPumpCard> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Map<String, dynamic>>(
-      stream: FirebaseService.espPump,
+      stream: FirebaseService.pumpAction,
       builder: (context, snapshot) {
         final data = snapshot.data ?? const {};
         final state = (data['state']?.toString() ?? 'OFF').toUpperCase();
@@ -157,16 +155,25 @@ class _ManualPumpCardState extends State<_ManualPumpCard> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
-                Text('esp/pump → $state  (plant P$fbPlant)',
-                    style: const TextStyle(fontSize: 13)),
+                StreamBuilder<int>(
+                  stream: FirebaseService.gantryPlant,
+                  builder: (context, gSnap) {
+                    final gPlant = gSnap.data ?? 0;
+                    return Text(
+                      'Pump: $state  |  Gantry at plant P$gPlant',
+                      style: const TextStyle(fontSize: 13),
+                    );
+                  },
+                ),
                 const SizedBox(height: 16),
 
-                const Text('Plant', style: TextStyle(fontWeight: FontWeight.w500)),
+                const Text('Target Plant',
+                    style: TextStyle(fontWeight: FontWeight.w500)),
                 const SizedBox(height: 8),
                 SegmentedButton<int>(
                   segments: const [
-                    ButtonSegment(value: 0, label: Text('P0  (3 cm)')),
-                    ButtonSegment(value: 1, label: Text('P1  (13 cm)')),
+                    ButtonSegment(value: 0, label: Text('Plant 0')),
+                    ButtonSegment(value: 1, label: Text('Plant 1')),
                   ],
                   selected: {_selectedPlant},
                   onSelectionChanged: disabled

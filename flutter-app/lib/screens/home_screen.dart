@@ -29,7 +29,7 @@ class HomeScreen extends StatelessWidget {
                   '🌿',
                   'AI plant monitoring',
                   'A camera and MobileNetV2 model scan your plants continuously, '
-                      'detecting disease, pests, and nutrient deficiency before they spread.',
+                      'detecting early blight and late blight before they spread.',
                 ),
                 _buildInfoCard(
                   context,

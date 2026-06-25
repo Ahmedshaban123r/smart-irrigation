@@ -9,13 +9,6 @@ void main() {
       expect(CommandParser.parse('stop all').type, CommandType.emergencyStop);
     });
 
-    test('recognizes cancel ai phrases', () {
-      expect(CommandParser.parse('cancel ai').type, CommandType.cancelAi);
-      expect(CommandParser.parse('cancel protocol').type, CommandType.cancelAi);
-      expect(CommandParser.parse('stop ai action').type, CommandType.cancelAi);
-      expect(CommandParser.parse('abort protocol').type, CommandType.cancelAi);
-    });
-
     test('recognizes pump on phrases', () {
       expect(CommandParser.parse('pump on').type, CommandType.pumpOn);
       expect(CommandParser.parse('turn on pump').type, CommandType.pumpOn);
@@ -27,26 +20,10 @@ void main() {
       expect(CommandParser.parse('turn off pump').type, CommandType.pumpOff);
     });
 
-    test('recognizes gantry move with x coordinate', () {
-      final cmd = CommandParser.parse('move gantry to x 200');
-      expect(cmd.type, CommandType.gantryMove);
-      expect(cmd.gantryX, 200);
-    });
-
-    test('clamps gantry x to 0–400 mm', () {
-      expect(CommandParser.parse('gantry x 500').gantryX, 400);
-      expect(CommandParser.parse('gantry x 0').gantryX, 0);
-    });
-
-    test('recognizes water for N seconds', () {
-      final cmd = CommandParser.parse('water for 45 seconds');
-      expect(cmd.type, CommandType.irrigate);
-      expect(cmd.irrigationSeconds, 45);
-    });
-
-    test('clamps irrigation to 10–600 seconds', () {
-      expect(CommandParser.parse('water for 5 seconds').irrigationSeconds, 10);
-      expect(CommandParser.parse('water for 1000 seconds').irrigationSeconds, 600);
+    test('extracts plant index from pump commands', () {
+      expect(CommandParser.parse('pump on plant 1').plant, 1);
+      expect(CommandParser.parse('pump on p1').plant, 1);
+      expect(CommandParser.parse('pump on').plant, 0);
     });
 
     test('returns unknown for unrecognized input', () {

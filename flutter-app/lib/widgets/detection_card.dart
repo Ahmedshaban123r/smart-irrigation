@@ -18,10 +18,8 @@ class DetectionCard extends StatelessWidget {
         return Colors.orange;
       case 'Late_Blight':
         return Colors.red;
-      case 'Pest':
-        return Colors.purple;
-      case 'Nutrient_Deficiency':
-        return Colors.blue;
+      case 'Unknown':
+        return Colors.blueGrey;
       default:
         return Colors.grey;
     }

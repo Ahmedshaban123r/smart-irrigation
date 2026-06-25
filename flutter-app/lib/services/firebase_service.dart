@@ -3,7 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 class FirebaseService {
   static final _db = FirebaseDatabase.instance;
 
-// Sensor streams — each returns a live Stream that updates automatically
+  // ── Sensor streams ───────────────────────────────────────────────────
   static Stream<double> get soilMoisture => _db
       .ref('sensors/soil_moisture_pct')
       .onValue
@@ -24,13 +24,28 @@ class FirebaseService {
       .onValue
       .map((e) => (e.snapshot.value as num?)?.toDouble() ?? 0.0);
 
-// System state stream
+  // ── Status streams ───────────────────────────────────────────────────
   static Stream<String> get systemState => _db
       .ref('status/system_state')
       .onValue
       .map((e) => e.snapshot.value?.toString() ?? 'NORMAL');
 
-// Latest AI detection stream
+  static Stream<String> get currentMode => _db
+      .ref('status/mode')
+      .onValue
+      .map((e) => e.snapshot.value?.toString() ?? 'AUTOMATIC');
+
+  static Stream<String> get pumpStatus => _db
+      .ref('status/pump')
+      .onValue
+      .map((e) => e.snapshot.value?.toString().toUpperCase() ?? 'OFF');
+
+  static Stream<int> get gantryPlant => _db
+      .ref('status/gantry_plant')
+      .onValue
+      .map((e) => (e.snapshot.value as num?)?.toInt() ?? 0);
+
+  // ── AI detection stream ──────────────────────────────────────────────
   static Stream<Map<String, dynamic>> get latestDetection =>
       _db.ref('ai/latest_detection').onValue.map((e) {
         final val = e.snapshot.value as Map?;
@@ -38,113 +53,31 @@ class FirebaseService {
         return Map<String, dynamic>.from(val);
       });
 
-// Mode stream — defaults to MANUAL if absent (safe fallback)
-  static Stream<String> get currentMode => _db
-      .ref('status/mode')
-      .onValue
-      .map((e) => e.snapshot.value?.toString() ?? 'AUTOMATIC');
+  // ── Commands ─────────────────────────────────────────────────────────
+  static Future<void> setMode(String mode) =>
+      _db.ref('status/mode').set(mode);
 
-  static Future<void> setMode(String mode) async {
-    await _db.ref('status/mode').set(mode);
-    await _db
-        .ref('status/mode_changed_at')
-        .set(DateTime.now().millisecondsSinceEpoch);
-  }
-
-// Pump status stream
-  static Stream<String> get pumpStatus => _db
-      .ref('status/pump')
-      .onValue
-      .map((e) => e.snapshot.value?.toString().toUpperCase() ?? 'OFF');
-
-// esp/pump live stream — single source of truth for pump+plant
-  static Stream<Map<String, dynamic>> get espPump =>
-      _db.ref('esp/pump').onValue.map((e) {
-        final val = e.snapshot.value as Map?;
-        if (val == null) return {'state': 'OFF', 'plant': 0, 'timestamp': 0};
-        return Map<String, dynamic>.from(val);
-      });
-
-  static Future<void> writeEspPump({required String state, required int plant}) =>
-      _db.ref('esp/pump').set({
+  static Future<void> writePumpAction({
+    required String state,
+    required int plant,
+  }) =>
+      _db.ref('commands/pump_action').set({
         'state': state,
         'plant': plant,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
 
-// AI action log stream — sorted newest first
-  static Stream<List<Map<String, dynamic>>> get actionLog =>
-      _db.ref('ai/action_log').onValue.map((e) {
+  static Stream<Map<String, dynamic>> get pumpAction =>
+      _db.ref('commands/pump_action').onValue.map((e) {
         final val = e.snapshot.value as Map?;
-        if (val == null) return [];
-        return val.values
-            .whereType<Map>()
-            .map((m) => Map<String, dynamic>.from(m))
-            .toList()
-          ..sort((a, b) => ((b['timestamp'] as num?) ?? 0)
-              .compareTo((a['timestamp'] as num?) ?? 0));
-      });
-
-// Active protocol stream
-  static Stream<Map<String, dynamic>> get activeProtocol =>
-      _db.ref('ai/active_protocol').onValue.map((e) {
-        final val = e.snapshot.value as Map?;
-        if (val == null) return {};
+        if (val == null) return {'state': 'OFF', 'plant': 0, 'timestamp': 0};
         return Map<String, dynamic>.from(val);
       });
 
   static Future<void> writeEmergencyStop() =>
       _db.ref('commands/emergency_stop').set(true);
 
-  // Legacy shims — route through esp/pump (single source of truth)
-  static int _lastPlant = 0;
-
-  static Future<void> writePump(String state) =>
-      writeEspPump(state: state.toUpperCase(), plant: _lastPlant);
-
-  static Future<void> writeGantryX(int x) async {
-    // Map gantry mm -> plant index (P0 = 3cm, P1 = 13cm; midpoint = 80mm)
-    _lastPlant = x >= 80 ? 1 : 0;
-    await _db.ref('status/gantry_x').set(x);
-  }
-
-  static Stream<int> get gantryX => _db
-      .ref('status/gantry_x')
-      .onValue
-      .map((e) => (e.snapshot.value as num?)?.toInt() ?? 0);
-
-  static Future<void> cancelAiProtocol() => Future.wait([
-        _db.ref('commands/cancel_ai_protocol').set(true),
-        _db.ref('ai/active_protocol').set({'status': 'idle'}),
-        _db.ref('status/system_state').set('NORMAL'),
-      ]);
-
-  static Future<void> writeIrrigationCycle(int durationSeconds) =>
-      _db.ref('commands/irrigation_cycle').set({
-        'duration': durationSeconds,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'source': 'app',
-      });
-
-  static Stream<bool> get connected => _db
-      .ref('.info/connected')
-      .onValue
-      .map((e) => e.snapshot.value as bool? ?? false);
-
-  static Future<void> writeActiveProtocol({
-    required String plantClass,
-    required int graceSeconds,
-    required int deadlineMs,
-  }) =>
-      _db.ref('ai/active_protocol').set({
-        'status': 'executing',
-        'triggered_class': plantClass,
-        'zone_x': 0,
-        'pump_state': 'ON',
-        'grace_remaining': graceSeconds,
-        'deadline_ms': deadlineMs,
-      });
-
+  // ── Alerts ───────────────────────────────────────────────────────────
   static Future<void> pushAlert({
     required String message,
     required String severity,
@@ -154,4 +87,10 @@ class FirebaseService {
         'severity': severity,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
+
+  // ── Connectivity ─────────────────────────────────────────────────────
+  static Stream<bool> get connected => _db
+      .ref('.info/connected')
+      .onValue
+      .map((e) => e.snapshot.value as bool? ?? false);
 }

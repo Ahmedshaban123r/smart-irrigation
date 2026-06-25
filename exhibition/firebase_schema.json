@@ -1,0 +1,35 @@
+{
+  "sensors": {
+    "soil_moisture_pct": 45,
+    "temperature": 28.5,
+    "humidity": 65,
+    "current": 0.0
+  },
+  "commands": {
+    "emergency_stop": false,
+    "pump_action": {
+      "state": "OFF",
+      "plant": 0,
+      "timestamp": 0
+    },
+    "pump_relay": false
+  },
+  "status": {
+    "mode": "AUTOMATIC",
+    "pump": "OFF",
+    "gantry_plant": 0,
+    "system_state": "NORMAL"
+  },
+  "ai": {
+    "latest_detection": {
+      "class": "Healthy",
+      "confidence": 0.95,
+      "entropy": 0.12,
+      "timestamp": "2026-06-20 18:00:00 UTC",
+      "source": "pi_daemon"
+    }
+  },
+  "alerts": {
+    "history": {}
+  }
+}

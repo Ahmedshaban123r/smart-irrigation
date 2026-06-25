@@ -1,0 +1,81 @@
+{
+  "ai": {
+    "active_protocol": {
+      "status": "idle"
+    },
+    "latest_detection": {
+      "class": "Unknown",
+      "confidence": 0.4297,
+      "entropy": 0.9817,
+      "source": "pi_controller",
+      "timestamp": "2026-06-20 21:54:22 UTC"
+    }
+  },
+  "alerts": {
+    "history": {
+      "-Ovaz1voXcZQF2i3Nc44": {
+        "message": "Plant Issue Detected: Unknown detected — check AI Monitor",
+        "severity": "warning",
+        "timestamp": 1781991747316
+      },
+      "-Ovaz5yRwEltfp6rzFHi": {
+        "message": "Plant Issue Detected: Unknown detected — check AI Monitor",
+        "severity": "warning",
+        "timestamp": 1781991763868
+      },
+      "-Ovaz9J4iCEXyjmOtWt5": {
+        "message": "Protocol Complete: Unknown protocol finished — resuming normal operation.",
+        "severity": "info",
+        "timestamp": 1781991777542
+      },
+      "-OvazA4wwjjzgZl8MME6": {
+        "message": "Plant Issue Detected: Unknown detected — check AI Monitor",
+        "severity": "warning",
+        "timestamp": 1781991780732
+      },
+      "-OvazA_572vPHepQUqna": {
+        "message": "Plant Issue Detected: Unknown detected — check AI Monitor",
+        "severity": "warning",
+        "timestamp": 1781991782726
+      },
+      "-OvazHTm8jr_G0STErDV": {
+        "message": "Protocol Complete: Unknown protocol finished — resuming normal operation.",
+        "severity": "info",
+        "timestamp": 1781991810994
+      },
+      "-Ovb1Y0I23BgRJgGk196": {
+        "message": "Plant Issue Detected: Unknown detected — check AI Monitor",
+        "severity": "warning",
+        "timestamp": 1781992665171
+      },
+      "-Ovb1kxbjF4XmZFwcmk2": {
+        "message": "Protocol Complete: Unknown protocol finished — resuming normal operation.",
+        "severity": "info",
+        "timestamp": 1781992722279
+      }
+    }
+  },
+  "commands": {
+    "cancel_ai_protocol": true,
+    "emergency_stop": false,
+    "pump_action": {
+      "plant": 0,
+      "state": "OFF",
+      "timestamp": 0
+    }
+  },
+  "sensors": {
+    "current": 0,
+    "humidity": 54,
+    "soil_moisture_pct": 0,
+    "temperature": 30.5
+  },
+  "status": {
+    "fan": "OFF",
+    "gantry_plant": 0,
+    "gantry_x": 0,
+    "mode": "AUTOMATIC",
+    "pump": "OFF",
+    "system_state": "NORMAL"
+  }
+}
